@@ -1,0 +1,27 @@
+{
+    "anaesthetic": {
+        "definition": "The drug used for anaesthesia.",
+        "value": "Ketalar+Domitor"
+    },
+    "anaesthetic_antidrug": {
+        "definition": "The drug used to wake up from anaesthesia.",
+        "value": "Antisedan"
+    },
+    "anaesthetic_antidrug_dose": {
+        "unit": "mL",
+        "value": 0.1
+    },
+    "anaesthetic_dose": {
+        "unit": "mL",
+        "value": ""
+    },
+    "description": {
+        "definition": "A textual description of the preparation.",
+        "value": "Anaesthetics"
+    },
+    "identifier": "anaesthesia_ketamine",
+    "name": "anaesthesia_ketamine",
+    "notes": {
+        "value": ""
+    }
+}

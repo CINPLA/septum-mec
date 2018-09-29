@@ -286,3 +286,21 @@ def attach_to_cli(cli):
         print('Converting to exdir')
         openephys.generate_spike_trains(exdir_path, openephys_file,
                                             source='klusta')
+
+    @cli.command('read-messages',
+                 short_help='Read messages from open-ephys recording session.')
+    @click.argument('openephys-path', type=click.Path(exists=True))
+    def generate_openephys_action(openephys_path):
+        # TODO default none
+        openephys_path = os.path.abspath(openephys_path)
+        openephys_dirname = openephys_path.split(os.sep)[-1]
+        project = expipe.require_project(PAR.USER_PARAMS['project_id'])
+
+        openephys_file = pyopenephys.File(openephys_path)
+        openephys_exp = openephys_file.experiments[0]
+        openephys_rec = openephys_exp.recordings[0]
+        messages = openephys_rec.messages
+
+        print('Open-ephys messages:')
+        for m in messages:
+            print('time: ', m['time'], ' message: ', m['message'])

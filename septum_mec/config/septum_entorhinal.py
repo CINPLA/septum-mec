@@ -4,7 +4,7 @@ import quantities as pq
 This is an example parameter file to use with expipe-plugin-cinpla.
 
 Reserved names:
-    subject
+    entity
     electrophysiology
     implantation
     injection
@@ -43,10 +43,10 @@ openephys_templates = [
 #  these are templates you want to add to each optogenetics session perfomed
 #  with openephys
 opto_openephys_templates = [
-    'mikkel_laser_settings',
-    'mikkel_pulse_pal_settings',
-    'mikkel_optogenetics_paradigm',
-    'mikkel_optogenetics_anatomical_location'
+    'laser_settings',
+    'pulse_pal_settings',
+    'optogenetics_paradigm',
+    'optogenetics_anatomical_location'
     'hardware_openephys_optogenetics',
     'hardware_pulse_pal',
     'hardware_blue_laser',
@@ -56,10 +56,10 @@ opto_openephys_templates = [
 #  these are templates you want to add to each optogenetics session perfomed
 #  with axona
 opto_axona_templates = [
-    'mikkel_laser_settings',
-    'mikkel_pulse_pal_settings',
-    'mikkel_optogenetics_paradigm',
-    'mikkel_optogenetics_anatomical_location',
+    'laser_settings',
+    'pulse_pal_settings',
+    'optogenetics_paradigm',
+    'optogenetics_anatomical_location',
     'hardware_axona_optogenetics',
     'hardware_pulse_pal',
     'hardware_blue_laser',
@@ -84,10 +84,10 @@ POSSIBLE_TAGS = OBLIGATORY_TAGS + [
 #  thse are the templates you want to load to each suregery implantation
 #  procedure
 surgery_implantation_templates = [
-    'mikkel_anaesthesia',
-    'mikkel_analgesia',
-    'mikkel_analgesia_post',
-    'mikkel_anaesthesia_local',
+    'anaesthesia',
+    'analgesia',
+    'analgesia_post',
+    'anaesthesia_local',
     'hardware_optic_fibre',
     'hardware_tetrode',
     'hardware_microdrive_optetrode',
@@ -97,17 +97,17 @@ surgery_implantation_templates = [
 
 # thse are the templates you want to load to each suregery injection procedure
 surgery_injection_templates = [
-    'mikkel_anaesthesia',
-    # 'mikkel_anaesthesia_ketamine',
-    'mikkel_analgesia',
-    'mikkel_analgesia_post',
-    'mikkel_anaesthesia_local',
+    'anaesthesia',
+    # 'anaesthesia_ketamine',
+    'analgesia',
+    'analgesia_post',
+    'anaesthesia_local',
     'environment_rat_housing',
     'environment_surgery_station'
 ]
 
 perfusion_templates = [
-    'mikkel_perfusion_procedure',
+    'perfusion_procedure',
     'environment_surgery_station'
 ]
 
@@ -146,7 +146,7 @@ ANALYSIS_PARAMS = {
 
 # this is personal user parameters
 USER_PARAMS = {
-    'project_id': 'mikkel_septum_entorhinal',
+    'project_id': 'septum_entorhinal',
     'user_name': 'Mikkel Elle Lepperød',
     'location': 'room2',
     'laser_device': {'name': 'hardware_blue_laser', 'id': 4}
@@ -161,13 +161,13 @@ TEMPLATES = {
     'surgery_implantation': surgery_implantation_templates,
     'surgery_injection': surgery_injection_templates,
     'perfusion': perfusion_templates,
-    'adjustment': ['mikkel_drive_depth_adjustment']
+    'adjustment': 'drive_depth_adjustment'
 }
 
 MODULES = {
-    'implantation': {'mecl': 'mikkel_implant_drive_mecl',
-                     'mecr': 'mikkel_implant_drive_mecr',
-                     'ms': 'mikkel_implant_fibre_ms'},
-    'injection': {'ms': 'mikkel_injection_ms'},
-    'subject': 'mikkel_subject'
+    'implantation': {'mecl': 'implant_drive_mecl',
+                     'mecr': 'implant_drive_mecr',
+                     'ms': 'implant_fibre_ms'},
+    'injection': {'ms': 'injection_ms'},
+    'entity': 'subject'
 }
