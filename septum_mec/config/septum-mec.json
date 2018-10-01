@@ -1,0 +1,112 @@
+{
+"POSSIBLE_BRAIN_AREAS": [
+    "MECR", "MECL", "MS"
+],
+"POSSIBLE_OPTO_TAGS": [
+    "opto-inside", "opto-outside", "opto-train"
+],
+"POSSIBLE_LOCATIONS": [
+    "room2", "room1"
+],
+"POSSIBLE_CELL_LINES": [
+    "gad1-cre", "wild-type"
+],
+"OBLIGATORY_TAGS": [
+    "no", "yes", "maybe"
+],
+"POSSIBLE_TAGS": [
+    "no", "yes", "maybe",
+    "GC", "PC", "BC", "SC", "HD", "TC", "theta", "baseline",
+    "AAV5-syn-hChR2-EYFP", "AAV8-hsyn-eChR2(H134R)-EYFP",
+    "AAV8-Ef1a-DIO-eChr2(H134R)-EYFP", "baseline"
+],
+"UNIT_INFO": {
+    "info_waveform": {
+        "alternatives": {
+            "BS": "definition: broad spiking waveform (putative excitatory)",
+            "NS": "definition: narrow spiking waveform (putative inhibitory)"
+        },
+        "value": ""
+    },
+    "info_pheno_type": {
+        "value": ""
+    }
+},
+"TEMPLATES": {
+    "axona": [
+        "hardware_axona_tracker",
+        "hardware_axona_daq",
+        "hardware_axona_camera_objective",
+        "environment_open_field_tracking",
+        "environment_rat_housing",
+        "hardware_optic_fibre",
+        "hardware_tetrode",
+        "hardware_microdrive_optetrode"
+    ],
+    "opto_axona": [
+        "laser_settings",
+        "pulse_pal_settings",
+        "optogenetics_paradigm",
+        "optogenetics_anatomical_location",
+        "hardware_axona_optogenetics",
+        "hardware_pulse_pal",
+        "hardware_blue_laser",
+        "hardware_laser_measure_device"
+    ],
+    "openephys": [
+        "hardware_openephys_daq",
+        "hardware_intan_headstage",
+        "hardware_pointgrey_camera_objective",
+        "software_bonsai_gui",
+        "software_openephys_gui",
+        "environment_open_field_tracking",
+        "environment_rat_housing",
+        "hardware_optic_fibre",
+        "hardware_tetrode",
+        "hardware_microdrive_optetrode"
+    ],
+    "opto_openephys": [
+        "laser_settings",
+        "pulse_pal_settings",
+        "optogenetics_paradigm",
+        "optogenetics_anatomical_location",
+        "hardware_openephys_optogenetics",
+        "hardware_pulse_pal",
+        "hardware_blue_laser",
+        "hardware_laser_measure_device"
+    ],
+    "surgery_implantation": [
+        "anaesthesia",
+        "analgesia",
+        "analgesia_post",
+        "anaesthesia_local",
+        "hardware_optic_fibre",
+        "hardware_tetrode",
+        "hardware_microdrive_optetrode",
+        "environment_rat_housing",
+        "environment_surgery_station"
+    ],
+    "surgery_injection": [
+        "anaesthesia",
+        "analgesia",
+        "analgesia_post",
+        "anaesthesia_local",
+        "environment_rat_housing",
+        "environment_surgery_station"
+    ],
+    "perfusion": [
+        "perfusion_procedure",
+        "environment_surgery_station"
+    ],
+    "adjustment": "drive_depth_adjustment",
+    "implantation": {
+        "mecl": "implant_drive_mecl",
+        "mecr": "implant_drive_mecr",
+        "ms": "implant_fibre_ms"
+    },
+    "injection": {
+        "ms": "injection_ms"
+    },
+    "entity": "subject"
+  }
+}

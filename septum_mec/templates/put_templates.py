@@ -4,11 +4,7 @@ import os.path as op
 import json
 import quantities as pq
 
-########################### DANGER DELETES ALL PAR.TEMPLATES #######################
-# expipe.core.FirebaseBackend("").set('/templates', {})
-# expipe.core.FirebaseBackend("").set('/templates_contents', {})
-################################################################################
-
+project = expipe.require_project('septum-mec')
 for root, dirs, files in os.walk('templates'):
     for fname in files:
         if not fname.endswith('.json'):
@@ -20,11 +16,4 @@ for root, dirs, files in os.walk('templates'):
             except:
                 print(fname)
                 raise
-
-        template = {
-            "identifier": name,
-            "name": name,
-        }
-        print('Put ' + name)
-        expipe.core.FirebaseBackend("/templates").set(name, template)
-        expipe.core.FirebaseBackend("/templates_contents").set(name, result)
+        project.require_template(name=name, contents=result)

@@ -161,10 +161,7 @@ TEMPLATES = {
     'surgery_implantation': surgery_implantation_templates,
     'surgery_injection': surgery_injection_templates,
     'perfusion': perfusion_templates,
-    'adjustment': ['mikkel_drive_depth_adjustment']
-}
-
-MODULES = {
+    'adjustment': ['mikkel_drive_depth_adjustment'],
     'implantation': {'mecl': 'mikkel_implant_drive_mecl',
                      'mecr': 'mikkel_implant_drive_mecr',
                      'ms': 'mikkel_implant_fibre_ms'},

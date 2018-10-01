@@ -6,15 +6,14 @@ import json
 overwrite = True
 
 base_dir = op.join(op.abspath(op.dirname(op.expanduser(__file__))), 'templates')
-
-templates = expipe.core.FirebaseBackend("/templates").get()
-for template, val in templates.items():
-    identifier = val.get('identifier')
+project = expipe.require_project('septum-mec')
+for template, val in project.templates.items():
+    result = val.to_dict()
+    identifier = result.get('identifier')
     if identifier is None:
         continue
 
-    fname = op.join(base_dir, 'templates', identifier + '.json')
-    result = expipe.get_template(template=template)
+    fname = op.join(base_dir, identifier + '.json')
     if op.exists(fname) and not overwrite:
         raise FileExistsError('The filename "' + fname +
                               '" exists, set ovewrite to true.')
