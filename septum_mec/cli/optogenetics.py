@@ -1,7 +1,7 @@
 from septum_mec.imports import *
 from expipe_plugin_cinpla.tools import action as action_tools
 from septum_mec.tools import opto as opto_tools
-from septum_mec.tools import config
+from expipe_plugin_cinpla.tools import config
 
 
 def attach_to_cli(cli):
@@ -77,9 +77,9 @@ def attach_to_cli(cli):
                            no_modules, use_axona_cut, pulse_phasedur,
                            pulse_period, no_intensity):
         # TODO deafault none
-        project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+        project = expipe.get_project(PAR.PROJECT_ID)
         action = project.require_action(action_id)
-        user = user or PAR.USER_PARAMS['user_name']
+        user = user or PAR.USERNAME
         user = user or []
         if len(user) == 0:
             raise ValueError('Please add user name')
@@ -141,7 +141,7 @@ def attach_to_cli(cli):
                   help='TTL input channel.',
                   )
     def parse_optogenetics_files(action_id, no_local, io_channel):
-        project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+        project = expipe.get_project(PAR.PROJECT_ID)
         action = project.require_action(action_id)
         fr = action.require_filerecord()
         if not no_local:

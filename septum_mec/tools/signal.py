@@ -5,166 +5,8 @@ from datetime import datetime
 import quantities as pq
 
 
-def auto_denoise(anas, thresh=None, copy_signal=True):
-    """Clean neural data from EMG, chewing, and moving artifact noise
-    Rectified signals are smoothed and thresholded to find and remove
-    noisy portion of the signals.
-
-    Parameters
-    ----------
-    anas : np.array
-           2d array of analog signals
-    thresh : float
-             (optional) threshold in number of SD on high-pass data
-    copy_signal : bool
-                  copy signals or not
-
-    Returns
-    -------
-    anas_copy :  cleaned analog signals
-    """
-    from scipy import signal
-    from copy import copy
-    if thresh:
-        thresh = thresh
-    else:
-        thresh = 2.5
-
-    if copy_anas:
-        anas_copy = copy(anas)
-    else:
-        anas_copy = anas
-
-    env = signal.hilbert(anas_copy)
-    env = np.abs(env)
-
-    # Smooth
-    smooth = 0.01
-    b_smooth, a_smooth = signal.butter(4, smooth)
-    env = signal.filtfilt(b_smooth, a_smooth, env)
-
-    if len(anas.shape) == 1:
-        sd = np.std(anas)
-    else:
-        sd = np.std(anas, axis=1)
-        noisy_idx = []
-        # Find time points in which all channels are noisy
-        for i in np.arange(len(anas[0])):
-            if np.all([env[ch, i] >= thresh*sd[ch] for ch in np.arange(env.shape[0])]):
-                noisy_idx.append(i)
-        anas_copy[:, noisy_idx] = 0
-
-
-    return anas_copy
-
-def manual_denoise(anas, thresh=None, copy_signal=True):
-    """Clean neural data from EMG, chewing, and moving artifact noise
-    User can select the points to cut out for the denoised signal.
-
-    Parameters
-    ----------
-    anas : np.array
-           2d array of analog signals
-    thresh : float
-             (optional) threshold in number of SD on high-pass data
-    copy_anas : bool
-                copy signals or not
-
-    Parameters
-    ----------
-    anas : np.array
-           2d array of analog signals
-    thresh : float
-             (optional) threshold in number of SD on high-pass data
-    copy_anas : bool
-                copy signals or not
-
-    Returns
-    -------
-    anas_copy :  cleaned analog signals
-    """
-    from copy import copy
-    import matplotlib.pyplot as plt
-
-    if copy_signal:
-        anas_copy = copy(anas)
-    else:
-        anas_copy = anas
-    plt.figure()
-    plt.plot(np.transpose(anas))
-    seg = plt.ginput(0, timeout=15)
-    seg_x = [seg[i][0] for i in range(len(seg))]
-
-    if divmod(len(seg_x), 2)[1] != 0:
-        seg_x = seg_x[:-2]
-
-    seg_x = [int(s) for s in seg_x]
-
-    # Clip selected
-    interv = np.reshape(seg_x, (int(len(seg)/2), 2))
-    for i, s in enumerate(interv):
-        anas_copy[:, s[0]:s[1]] = 0
-
-    return anas_copy
-
-def ica_denoise(anas, channels=None, n_comp=10, correlation_thresh=0.1):
-    """Removes noise by ICA. Indepentend components highly correlated to the
-    grand average of the signals are removed.
-    Signals are then back projected to the channel space.
-
-    Parameters
-    ----------
-    anas : np.array
-           2d array of analog signals
-    channels : list
-               list of good channels to perform ICA with
-    n_comp : int
-             number of ICA components
-    correlation_tresh : float
-                        correlation threshold between average signal
-                        and source above which source contibution gets
-                        removed
-
-    Returns
-    -------
-    anas_sig : cleaned analog signals
-    anas_noise : noise projection on signals
-    sources : ICA sources
-    mixing : ICA mixing matrix
-    corr : correlation between ICA sources and average signal
-    """
-    from sklearn.decomposition import FastICA
-    from scipy import stats
-    if channels is None:
-        channels = np.arange(anas.shape[0])
-
-    print('Applying ICA...')
-    ica = FastICA(n_components=n_comp)
-    sources = np.transpose(ica.fit_transform(np.transpose(anas[channels])))
-    mixing = ica.mixing_
-
-    ref = np.mean(anas[channels], axis=0)
-
-    # find correlations
-    corr = np.zeros(n_comp)
-    print('Computing correlations...')
-    for i in np.arange(n_comp):
-        corr[i] = stats.stats.pearsonr(ref, sources[i])[0]
-
-    anas_sig = np.zeros(anas.shape)
-    anas_noise = np.zeros(anas.shape)
-
-    idx_sig = np.where(corr <= correlation_thresh)
-    idx_noise = np.where(corr > correlation_thresh)
-    anas_sig[channels] = np.squeeze(np.dot(mixing[:, idx_sig], sources[idx_sig]))
-    anas_noise[channels] = np.squeeze(np.dot(mixing[:, idx_noise], sources[idx_noise]))
-
-    return anas_sig, anas_noise, sources, mixing, corr
-
-
 def apply_CAR(anas, channels=None, car_type='mean', split_probe=None, copy_signal=True):
     """Removes noise by Common Average or Median Reference.
-
     Parameters
     ----------
     anas : np.array
@@ -176,7 +18,6 @@ def apply_CAR(anas, channels=None, car_type='mean', split_probe=None, copy_signa
     split_probe : int
                   splits anas into different probes to apply
                   car/cmr to each probe separately
-
     Returns
     -------
     anas_car : cleaned analog signals
@@ -219,7 +60,6 @@ def apply_CAR(anas, channels=None, car_type='mean', split_probe=None, copy_signa
 
 def extract_rising_edges(adc_signal, times, thresh=1.65):
     """Extract rising times from analog signal used as TTL.
-
     Parameters
     ----------
     adc_signal : np.array
@@ -228,7 +68,6 @@ def extract_rising_edges(adc_signal, times, thresh=1.65):
             timestamps array
     thresh: float
             threshold to detect 'high' value
-
     Returns
     -------
     rising_times : np.array with rising times
@@ -247,10 +86,9 @@ def extract_rising_edges(adc_signal, times, thresh=1.65):
 
     return rising_times
 
-def filter_analog_signals(anas, freq, fs, filter_type='bandpass', order=3, copy_signal=False):
+def filter_analog_signals(anas, freq, fs, filter_type='bandpass', filter_function='filtfilt', order=3, copy_signal=False):
     """Filters analog signals with zero-phase Butterworth filter.
     The function raises an Exception if the required filter is not stable.
-
     Parameters
     ----------
     anas : np.array
@@ -261,36 +99,43 @@ def filter_analog_signals(anas, freq, fs, filter_type='bandpass', order=3, copy_
          sampling frequency
     filter_type : string
                   'lowpass', 'highpass', 'bandpass', 'bandstop'
+    filter_function : string
+        'filtfilt' or 'lfilter'
     order : int
             filter order
     parallel : bool
                parallel or not
     nprocesses : int
                  if parallel, number of processes
-
     Returns
     -------
     anas_filt : filtered signals
     """
-    from scipy.signal import butter, filtfilt
+    from scipy.signal import butter, filtfilt, lfilter
     fn = fs / 2.
     band = np.array(freq) / fn
+
+    if filter_function == 'filtfilt':
+        filterfun = filtfilt
+    elif filter_function == 'lfilter':
+        filterfun = lfilter
+    else:
+        raise NotImplementedError('filter-function {} not recognized'.format(filter_function))
 
     b, a = butter(order, band, btype=filter_type)
 
     if np.all(np.abs(np.roots(a)) < 1) and np.all(np.abs(np.roots(a)) < 1):
-        print('Filtering signals with ', filter_type, ' filter at ' , freq ,'...')
+        print('Filtering signals using', filter_function, 'with order', order, filter_type, 'with critical frequencies', freq ,'...')
         if len(anas.shape) == 2:
-            anas_filt = filtfilt(b, a, anas, axis=1)
+            anas_filt = filterfun(b, a, anas, axis=1)
         elif len(anas.shape) == 1:
-            anas_filt = filtfilt(b, a, anas)
+            anas_filt = filterfun(b, a, anas)
         return anas_filt
     else:
         raise ValueError('Filter is not stable')
 
 def ground_bad_channels(anas, bad_channels, copy_signal=True):
     """Grounds selected noisy channels.
-
     Parameters
     ----------
     anas : np.array
@@ -299,7 +144,6 @@ def ground_bad_channels(anas, bad_channels, copy_signal=True):
                    list of channels to be grounded
     copy_signal : bool
                   copy signals or not
-
     Returns
     -------
     anas_zeros : analog signals with grounded channels
@@ -325,7 +169,6 @@ def ground_bad_channels(anas, bad_channels, copy_signal=True):
 def duplicate_bad_channels(anas, bad_channels, probefile, copy_signal=True):
     """Duplicate selected noisy channels with channels in
     the same channel group.
-
     Parameters
     ----------
     anas : np.array
@@ -336,7 +179,6 @@ def duplicate_bad_channels(anas, bad_channels, probefile, copy_signal=True):
                 absolute path to klusta-like probe file
     copy_signal : bool
                   copy signals or not
-
     Returns
     -------
     anas_dup : analog signals with duplicated channels
@@ -379,10 +221,10 @@ def duplicate_bad_channels(anas, bad_channels, probefile, copy_signal=True):
 
     return anas_dup
 
+
 def save_binary_format(filename, signal, spikesorter='klusta'):
     """Saves analog signals into klusta (time x chan) or spyking
     circus (chan x time) binary format (.dat)
-
     Parameters
     ----------
     filename : string
@@ -391,7 +233,6 @@ def save_binary_format(filename, signal, spikesorter='klusta'):
              2d array of analog signals
     spikesorter : string
                   'klusta' or 'spykingcircus'
-
     Returns
     -------
     """
@@ -408,9 +249,12 @@ def save_binary_format(filename, signal, spikesorter='klusta'):
 
 
 def create_klusta_prm(pathname, prb_path, nchan=32, fs=30000,
-                      klusta_filter=True, filter_low=300, filter_high=6000):
+                      klusta_filter=True, filter_low=300, filter_high=6000,
+                      filter_order=3,
+                      use_single_threshold=True,
+                      threshold_strong_std_factor=4.5,
+                      threshold_weak_std_factor=2):
     """Creates klusta .prm files, with spikesorting parameters
-
     Parameters
     ----------
     pathname : string
@@ -427,6 +271,8 @@ def create_klusta_prm(pathname, prb_path, nchan=32, fs=30000,
                 low cutoff frequency (if klusta_filter is True)
     filter_high : float
                   high cutoff frequency (if klusta_filter is True)
+    filter_order : int
+        Butterworth filter order, default is 3.
     Returns
     -------
     full_filename : absolute path of .prm file
@@ -450,153 +296,26 @@ def create_klusta_prm(pathname, prb_path, nchan=32, fs=30000,
         f.write("spikedetekt = dict(")
         if klusta_filter:
             f.write("\n\tfilter_low="+str(filter_low)+",\n\tfilter_high="+str(filter_high)+","
-                    "\n\tfilter_butter_order=3,\n\tfilter_lfp_low=0,\n\tfilter_lfp_high=300,\n")
+                    "\n\tfilter_butter_order="+str(filter_order)+",\n\tfilter_lfp_low=0,\n\tfilter_lfp_high=300,\n")
         f.write("\n\tchunk_size_seconds=1,\n\tchunk_overlap_seconds=.015,\n"
                 "\n\tn_excerpts=50,\n\texcerpt_size_seconds=1,"
-                "\n\tthreshold_strong_std_factor=4.5,\n\tthreshold_weak_std_factor=2,\n\tdetect_spikes='negative',"
+                "\n\tuse_single_threshold=" + str(use_single_threshold) +","
+                "\n\tthreshold_strong_std_factor=" + str(threshold_strong_std_factor) + ",\n"
+                "\tthreshold_weak_std_factor=" + str(threshold_weak_std_factor) + ",\n"
+                "\tdetect_spikes='negative',"
                 "\n\n\tconnected_component_join_size=1,\n"
-                "\n\textract_s_before=16,\n\textract_s_after=48,\n"
+                "\n\textract_s_before=16,\n\textract_s_after=64,\n"
                 "\n\tn_features_per_channel=3,\n\tpca_n_waveforms_max=10000,\n)")
         f.write('\n')
         f.write('\n')
-        f.write("klustakwik2 = dict(\n\tnum_starting_clusters=50,\n)")
+        f.write("klustakwik2 = dict(\n\tnum_starting_clusters=50,\n\tnum_cpus=8\n)")
                 # "\n\tnum_cpus=4,)")
     return full_filename
-
-
-def remove_stimulation_artifacts(anas, times, trigger, pre=3 * pq.ms, post=5 * pq.ms,
-                                 mode='zero', copy_signal=True):
-    """Removes stimulation artifact by either grounding the stimulation window or
-    computing and removing the average artifact template.
-
-    Parameters
-    ----------
-    anas : np.array
-           2d array of analog signals
-    times : quantity list
-            timestamps
-    trigger : quantity list
-              timestamps of stimulation triggers
-    pre : time quantity
-          time to include before trigger times
-    post : time quantity
-           time to include after trigger times
-    mode : string
-           'zero' or 'template'
-    copy_signal : bool
-                  copy signals or not
-
-    Returns
-    -------
-    anas_rem : analog signals after artifact removal
-    avg_artifact : if 'template', average artifact removed
-    """
-    from copy import copy
-    if copy_signal:
-        anas_rem = copy(anas)
-    else:
-        anas_rem = anas
-    print('Removing stimulation artifacts from ', len(trigger), ' triggers...')
-
-    if mode is 'template':
-        # Find shortest artifacte length
-        idxs = []
-        for i, tr in enumerate(trigger):
-            idxs.append(len(np.where((times > tr - pre) & (times < tr + post))[0]))
-
-        min_len = np.min(idxs)
-        templates = np.zeros((anas.shape[0], len(trigger), min_len))
-
-        # Compute average artifact template
-        for i, tr in enumerate(trigger):
-            idx = np.where((times > tr - pre) & (times < tr + post))[0][:min_len]
-            templates[:, i, ] = np.squeeze(anas[:, idx])
-        avg_artifact = np.mean(templates, axis=1)
-
-        # Remove average artifact template
-        for i, tr in enumerate(trigger):
-            idx = np.where((times > tr - pre) & (times < tr + post))[0][:min_len]
-            print(anas_rem[:, idx].shape)
-            anas_rem[:, idx] -= avg_artifact
-
-    elif mode is 'zero':
-        avg_artifact = []
-        for tr in trigger:
-            idx = np.where((times > tr - pre) & (times < tr + post))
-            anas_rem[:, idx] = 0
-
-    return anas_rem, avg_artifact
-
-
-def extract_stimulation_waveform(stim, trig, times):
-    """Extracts stimulation pulse parameters from stimulation signals and
-    trigger times.
-
-    Parameters
-    ----------
-    stim : np.array
-           2d array of stimulation analog signals
-    trigger : quantity list
-              timestamps of stimulation triggers
-    times : quantity list
-            timestamps
-
-    Returns
-    -------
-    stim_clip : single stimulation pulse
-    curr : currents for each phase (list)
-    phase : phase durations (list)
-    """
-    period = np.mean(np.diff(times))
-
-    done = False
-    while done is False:
-        if len(trig) > 1:
-            rnd = np.random.permutation(len(trig)-1)[0]
-            idx = np.where((times > trig[rnd]-1*period) & (times < trig[rnd+1]-10*period))
-            stim_clip = np.squeeze(stim[:, idx[0]])
-        else:
-            stim_clip = stim
-
-        # clip last zeros
-        idx_non_zero = np.where(stim_clip[0][::-1] != 0)
-        if len(idx_non_zero[0]) != 0:
-            last_non_zero = stim_clip.shape[1] - np.where(stim_clip[0][::-1] != 0)[0][0]
-        else:
-            last_non_zero = -1
-        stim_clip = stim_clip[:,:last_non_zero]
-
-        curr = []
-        phase = []
-        done=False
-        for ch, st in enumerate(stim_clip):
-            current_levels = np.unique(stim_clip)
-            transitions = np.where(np.diff(st) != 0)
-            start=0
-            currs=[]
-            phases=[]
-            for t in transitions:
-                currs.append(np.round(st[start+1]).magnitude)
-                phases.append(((t-start+1)*period).magnitude)
-                start = start+t
-            #add last phase
-            currs.append(np.round(st[start+1]).magnitude)
-            phases.append(((len(st)-(start+1))*period).magnitude)
-            try:
-                curr.append(pq.Quantity(currs, stim_clip.dimensionality))
-                phase.append(pq.Quantity(phases, period.dimensionality))
-                done=True
-            except ValueError:
-                done=False
-
-
-    return stim_clip, curr, phase
 
 
 def find_frequency_range(anas, fs, freq_range, nchunks=30, chunksize=1*pq.s):
     """Finds a peak in the spectrum withink defined frequency range.
     Specta are computed on chunks of signals and averaged over channels.
-
     Parameters
     ----------
     anas : np.array
@@ -609,7 +328,6 @@ def find_frequency_range(anas, fs, freq_range, nchunks=30, chunksize=1*pq.s):
              number of chunks used to compute spectra
     chunksize: time Quantity
                length of chunks
-
     Returns
     -------
     fpeak : peak in Hz

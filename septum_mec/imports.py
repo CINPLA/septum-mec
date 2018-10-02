@@ -7,9 +7,6 @@ def pd():
     import pandas as pd
     return pd
 
-
-
-
 @lazy_import
 def pyopenephys():
     import pyopenephys

@@ -1,21 +1,8 @@
 from septum_mec.imports import *
 from expipe_plugin_cinpla.tools import action as action_tools
-from expipe_plugin_cinpla.tools import config
+from septum_mec.tools import signal as sig_tools
 from datetime import timedelta
-
-
-
-def validate_depth(ctx, param, depth):
-    try:
-        out = []
-        for pos in depth:
-            key, num, z, unit = pos.split(' ', 4)
-            out.append((key, int(num), float(z), unit))
-        return tuple(out)
-    except ValueError:
-        raise click.BadParameter('Depth need to be contained in "" and ' +
-                                 'separated with white space i.e ' +
-                                 '<"key num depth physical_unit"> (ommit <>).')
+from expipe_plugin_cinpla.tools import config
 
 
 def attach_to_cli(cli):
@@ -131,7 +118,7 @@ def attach_to_cli(cli):
             import klustakwik2
         action = None
         if exdir_path is None:
-            project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+            project = expipe.get_project(PAR.PROJECT_ID)
             action = project.require_action(action_id)
             fr = action.require_filerecord()
             if not no_local:
@@ -266,7 +253,7 @@ def attach_to_cli(cli):
     def generate_klusta_oe(action_id, prb_path, no_local, openephys_path,
                            exdir_path, nchan):
         if openephys_path is None:
-            project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+            project = expipe.get_project(PAR.PROJECT_ID)
             action = project.require_action(action_id)
             fr = action.require_filerecord()
             if not no_local:
@@ -294,7 +281,7 @@ def attach_to_cli(cli):
         # TODO default none
         openephys_path = os.path.abspath(openephys_path)
         openephys_dirname = openephys_path.split(os.sep)[-1]
-        project = expipe.require_project(PAR.USER_PARAMS['project_id'])
+        project = expipe.require_project(PAR.PROJECT_ID)
 
         openephys_file = pyopenephys.File(openephys_path)
         openephys_exp = openephys_file.experiments[0]

@@ -1,7 +1,7 @@
 from septum_mec.imports import *
 from expipe_plugin_cinpla.tools import action as action_tools
-from septum_mec.tools import config
 from septum_mec.analysis.analyser import Analyser
+from expipe_plugin_cinpla.tools import config
 
 
 def attach_to_cli(cli):
@@ -22,7 +22,7 @@ def attach_to_cli(cli):
                   help='Store temporary on local drive.',
                   )
     def generate_notebook(action_id, channel_group, no_local, run):
-        project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+        project = expipe.get_project(PAR.PROJECT_ID)
         action = project.require_action(action_id)
         fr = action.require_filerecord()
         if not no_local:
@@ -81,7 +81,7 @@ def attach_to_cli(cli):
                   )
     def analysis(**kwargs):
         if len(kwargs['channel_group']) == 0: kwargs['channel_group'] = None
-        project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+        project = expipe.get_project(PAR.PROJECT_ID)
         action_id = kwargs['action_id'] + '-analysis'
         action = project.require_action(action_id)
         if kwargs['overwrite'] and kwargs['hard']:
@@ -91,7 +91,7 @@ def attach_to_cli(cli):
                 print(str(e))
         rec_action = project.require_action(kwargs['action_id'])
         action.type = 'Action-analysis'
-        user = kwargs['user'] or PAR.USER_PARAMS['user_name']
+        user = kwargs['user'] or PAR.USERNAME
         user = user or []
         if len(user) == 0:
             raise ValueError('Please add user name')
@@ -193,11 +193,11 @@ def attach_to_cli(cli):
                   )
     def group_analysis(action_id, user, tags, overwrite, subjects,
                        locations, actions):
-        project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+        project = expipe.get_project(PAR.PROJECT_ID)
         analysis_action = project.require_action(action_id)
 
         analysis_action.type = 'Group-analysis'
-        user = user or PAR.USER_PARAMS['user_name']
+        user = user or PAR.USERNAME
         if user is None:
             raise ValueError('Please add user name')
         if len(user) == 0:
@@ -218,7 +218,7 @@ def attach_to_cli(cli):
             if len(subjects) > 0:
                 if not any(s in subjects for s in action.subjects):
                     continue
-            if les(locations) > 0:
+            if len(locations) > 0:
                 if action.location not in locations:
                     continue
             fr = action.require_filerecord()
@@ -247,7 +247,7 @@ def attach_to_cli(cli):
         ch.setLevel(logging.DEBUG)
         logger.addHandler(ch)
 
-        project = expipe.get_project(PAR.USER_PARAMS['project_id'])
+        project = expipe.get_project(PAR.PROJECT_ID)
         action = project.require_action(action_id)
         fr = action.require_filerecord()
         if not no_local:
