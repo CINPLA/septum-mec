@@ -227,18 +227,18 @@ def attach_to_cli(cli):
                     logfile.write(f.read())
                 f.close()
 
-        # if not no_spikes:
-        #     print('Converting from ".kwik" to ".exdir"')
-        #     openephys.generate_spike_trains(
-        #         exdir_path, openephys_rec, source='klusta')
-        #     print('Processed spiketrains, manual clustering possible')
-        # if not no_lfp:
-        #     print('Filtering and downsampling raw data to LFP.')
-        #     openephys.generate_lfp(exdir_path, openephys_rec)
-        #     print('Finished processing LFPs.')
-        # if not no_tracking:
-        #     print('Converting tracking from OpenEphys raw data to ".exdir"')
-        #     openephys.generate_tracking(exdir_path, openephys_rec)
+        if not no_spikes:
+            print('Converting from ".kwik" to ".exdir"')
+            openephys.generate_spike_trains(
+                exdir_path, openephys_rec, source='klusta')
+            print('Processed spiketrains, manual clustering possible')
+        if not no_lfp:
+            print('Filtering and downsampling raw data to LFP.')
+            openephys.generate_lfp(exdir_path, openephys_rec)
+            print('Finished processing LFPs.')
+        if not no_tracking:
+            print('Converting tracking from OpenEphys raw data to ".exdir"')
+            openephys.generate_tracking(exdir_path, openephys_rec)
             # TODO update
             # if shutter_channel is not None:
             #     ttl_times = openephys_file.digital_in_signals[0].times[
