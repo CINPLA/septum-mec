@@ -139,6 +139,7 @@ def attach_to_cli(cli):
             openephys_file = pyopenephys.File(openephys_path, prb_path)
             openephys_exp = openephys_file.experiments[0]
             openephys_rec = openephys_exp.recordings[0]
+            klusta_path = op.join(openephys_path, 'klusta')
         if not no_preprocess:
             # if not pre_filter and not klusta_filter:
             #     pre_filter = True
@@ -175,7 +176,6 @@ def attach_to_cli(cli):
             from septum_mec.tools.utils import read_python, write_python
             probe = read_python(prb_path)['channel_groups']
             klusta_prms = []
-            klusta_path = op.join(openephys_path, 'klusta')
             for channel_group, electrodes in probe.items():
                 ana = anas[electrodes['channels'], :]
                 name = 'ch_grp_{}'.format(channel_group)
@@ -213,17 +213,19 @@ def attach_to_cli(cli):
 
         if not no_klusta:
             processes = []
+            import tempfile
             for i, klusta_prm in enumerate(klusta_prms):
                 print('Running klusta, process {}'.format(i))
-                f = os.tmpfile()
+                f = tempfile.TemporaryFile()
                 p = subprocess.Popen(
-                    ['klusta', klusta_prm, '--overwrite'], stdout=f)
+                        ['klusta', klusta_prm, '--overwrite'], stdout=f,
+                        cwd=klusta_path)
                 processes.append((p, f, i))
 
             for p, f, i in processes:
                 p.wait()
                 f.seek(0)
-                with open("klusta_log_{}.txt".format(i), "wb") as logfile:
+                with open(op.join(klusta_path,"klusta_log_{}.txt".format(i)), "wb") as logfile:
                     logfile.write(f.read())
                 f.close()
 

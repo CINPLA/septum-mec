@@ -271,7 +271,7 @@ def create_klusta_prm(prb_path, nchan=32, fs=30000,
     with open(full_filename, 'w') as f:
         f.write('\n')
         f.write('experiment_name = ' + "r'" + prb_path + '_klusta' + "'" + '\n')
-        f.write('prb_file = ' + "r'" + prb_path + "'")
+        f.write('prb_file = ' + "r'" + prb_path + ".prb'")
         f.write('\n')
         f.write('\n')
         f.write("traces = dict(\n\traw_data_files=[experiment_name + '.dat'],\n\tvoltage_gain=1.,"
