@@ -3,6 +3,7 @@ import os.path as op
 import numpy as np
 from datetime import datetime
 import quantities as pq
+from .utils import read_python
 
 
 def apply_CAR(anas, channels=None, car_type='mean', split_probe=None, copy_signal=True):
@@ -192,18 +193,7 @@ def duplicate_bad_channels(anas, bad_channels, probefile, copy_signal=True):
                 rnd_idx = np.random.choice(gr[gr != ch_idx])
                 return rnd_idx
 
-    def _read_python(path):
-        from six import exec_
-        path = op.realpath(op.expanduser(path))
-        assert op.exists(path)
-        with open(path, 'r') as f:
-            contents = f.read()
-        metadata = {}
-        exec_(contents, {}, metadata)
-        metadata = {k.lower(): v for (k, v) in metadata.items()}
-        return metadata
-
-    probefile_ch_mapping = _read_python(probefile)['channel_groups']
+    probefile_ch_mapping = read_python(probefile)['channel_groups']
 
     from copy import copy
     nsamples = anas.shape[1]
@@ -248,7 +238,7 @@ def save_binary_format(filename, signal, spikesorter='klusta'):
             np.array(signal, dtype='float32').tofile(f)
 
 
-def create_klusta_prm(pathname, prb_path, nchan=32, fs=30000,
+def create_klusta_prm(prb_path, nchan=32, fs=30000,
                       klusta_filter=True, filter_low=300, filter_high=6000,
                       filter_order=3,
                       use_single_threshold=True,
@@ -257,8 +247,6 @@ def create_klusta_prm(pathname, prb_path, nchan=32, fs=30000,
     """Creates klusta .prm files, with spikesorting parameters
     Parameters
     ----------
-    pathname : string
-               absolute path (_klusta.dat or _spycircus.dat are appended)
     prbpath : np.array
               2d array of analog signals
     nchan : int
@@ -277,15 +265,12 @@ def create_klusta_prm(pathname, prb_path, nchan=32, fs=30000,
     -------
     full_filename : absolute path of .prm file
     """
-    assert pathname is not None
-    abspath = op.abspath(pathname)
-    assert prb_path is not None
     prb_path = op.abspath(prb_path)
-    full_filename = abspath + '.prm'
+    full_filename = prb_path + '.prm'
     print('Saving ', full_filename)
     with open(full_filename, 'w') as f:
         f.write('\n')
-        f.write('experiment_name = ' + "r'" + abspath + '_klusta' + "'" + '\n')
+        f.write('experiment_name = ' + "r'" + prb_path + '_klusta' + "'" + '\n')
         f.write('prb_file = ' + "r'" + prb_path + "'")
         f.write('\n')
         f.write('\n')
@@ -347,3 +332,18 @@ def find_frequency_range(anas, fs, freq_range, nchunks=30, chunksize=1*pq.s):
                               (fpre<freq_range[1]))])]
 
     return int(fpeak)*pq.Hz
+
+
+def save_geom_from_probefile(probefile, inter_group_dist=100,
+                             inter_electrode_distance=10):
+    prb_dict = read_python(probefile)
+    positions = []
+    for grp_id, electrodes in prb_dict['channel_groups'].items():
+        for i_e, elec in enumerate(electrodes['channels']):
+            pos = [0, (grp_id*inter_electrode_distance) + (i_e*inter_electrode_distance)]
+            positions.append(pos)
+    print(positions)
+
+if __name__ == '__main__':
+    prbpath = '/home/mikkel/apps/expipe-project/septum-mec/septum_mec/probes/tetrodes32ch-klusta-oe.prb'
+    # save_geom_from_probefile(prbpath)

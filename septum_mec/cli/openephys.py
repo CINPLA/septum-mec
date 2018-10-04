@@ -1,8 +1,9 @@
 from septum_mec.imports import *
 from expipe_plugin_cinpla.tools import action as action_tools
-from septum_mec.tools import signal as sig_tools
+from septum_mec.tools import signals as sig_tools
 from datetime import timedelta
 from expipe_plugin_cinpla.tools import config
+import os.path as op
 
 
 def attach_to_cli(cli):
@@ -134,28 +135,18 @@ def attach_to_cli(cli):
             openephys_session = acquisition.attrs["openephys_session"]
             openephys_path = os.path.join(str(acquisition.directory), openephys_session)
             openephys_base = os.path.join(openephys_path, openephys_session)
-            klusta_prm = os.path.abspath(openephys_base) + '.prm'
             prb_path = prb_path or settings.get('probe')
             openephys_file = pyopenephys.File(openephys_path, prb_path)
-            print(openephys_path)
             openephys_exp = openephys_file.experiments[0]
             openephys_rec = openephys_exp.recordings[0]
         if not no_preprocess:
-            if not pre_filter and not klusta_filter:
-                pre_filter = True
-            elif pre_filter and klusta_filter:
-                raise IOError('Choose either klusta-filter or pre-filter.')
+            # if not pre_filter and not klusta_filter:
+            #     pre_filter = True
+            # elif pre_filter and klusta_filter:
+            #     raise IOError('Choose either klusta-filter or pre-filter.')
             anas = openephys_rec.analog_signals[0].signal
             fs = openephys_rec.sample_rate.magnitude
             nchan = anas.shape[0]
-            sig_tools.create_klusta_prm(openephys_base, prb_path, nchan,
-                              fs=fs, klusta_filter=klusta_filter,
-                              filter_low=filter_low,
-                              filter_high=filter_high,
-                              filter_order=filter_order,
-                              use_single_threshold=use_single_threshold,
-                              threshold_strong_std_factor=threshold_strong_std_factor,
-                              threshold_weak_std_factor=threshold_weak_std_factor)
             if pre_filter:
                 anas = sig_tools.filter_analog_signals(anas, freq=[filter_low, filter_high],
                                              fs=fs, filter_type='bandpass',
@@ -179,8 +170,31 @@ def attach_to_cli(cli):
                                     split_probe=split_probe)
             if len(ground) != 0:
                 duplicate = [int(g) for g in ground]
-                anas = sig_tools.duplicate_bad_channels(anas, duplicate, prb_path)
-            sig_tools.save_binary_format(openephys_base, anas)
+                anas = sig_tools.duplicate_bad_channels(
+                    anas, duplicate, prb_path)
+            from septum_mec.tools.utils import read_python, write_python
+            probe = read_python(prb_path)['channel_groups']
+            klusta_prms = []
+            klusta_path = op.join(openephys_path, 'klusta')
+            for channel_group, electrodes in probe.items():
+                ana = anas[electrodes['channels'], :]
+                name = 'ch_grp_{}'.format(channel_group)
+                path = op.join(klusta_path, name)
+                val = {'channel_groups': {channel_group: electrodes}}
+                write_python(path + '.prb', val, overwrite=True)
+                prm = sig_tools.create_klusta_prm(
+                    prb_path=path,
+                    nchan=len(electrodes['channels']),
+                    fs=fs,
+                    klusta_filter=klusta_filter,
+                    filter_low=filter_low,
+                    filter_high=filter_high,
+                    filter_order=filter_order,
+                    use_single_threshold=use_single_threshold,
+                    threshold_strong_std_factor=threshold_strong_std_factor,
+                    threshold_weak_std_factor=threshold_weak_std_factor)
+                klusta_prms.append(prm)
+                sig_tools.save_binary_format(path, ana, spikesorter='klusta')
             if action is not None:
                 prepro = {
                     'common_ref': common_ref,
@@ -198,23 +212,33 @@ def attach_to_cli(cli):
                                       overwrite=True)
 
         if not no_klusta:
-            print('Running klusta')
-            try:
-                subprocess.check_output(['klusta', klusta_prm, '--overwrite'])
-            except subprocess.CalledProcessError as e:
-                raise Exception(e.output)
-        if not no_spikes:
-            print('Converting from ".kwik" to ".exdir"')
-            openephys.generate_spike_trains(exdir_path, openephys_rec,
-                                            source='klusta')
-            print('Processed spiketrains, manual clustering possible')
-        if not no_lfp:
-            print('Filtering and downsampling raw data to LFP.')
-            openephys.generate_lfp(exdir_path, openephys_rec)
-            print('Finished processing LFPs.')
-        if not no_tracking:
-            print('Converting tracking from OpenEphys raw data to ".exdir"')
-            openephys.generate_tracking(exdir_path, openephys_rec)
+            processes = []
+            for i, klusta_prm in enumerate(klusta_prms):
+                print('Running klusta, process {}'.format(i))
+                f = os.tmpfile()
+                p = subprocess.Popen(
+                    ['klusta', klusta_prm, '--overwrite'], stdout=f)
+                processes.append((p, f, i))
+
+            for p, f, i in processes:
+                p.wait()
+                f.seek(0)
+                with open("klusta_log_{}.txt".format(i), "wb") as logfile:
+                    logfile.write(f.read())
+                f.close()
+
+        # if not no_spikes:
+        #     print('Converting from ".kwik" to ".exdir"')
+        #     openephys.generate_spike_trains(
+        #         exdir_path, openephys_rec, source='klusta')
+        #     print('Processed spiketrains, manual clustering possible')
+        # if not no_lfp:
+        #     print('Filtering and downsampling raw data to LFP.')
+        #     openephys.generate_lfp(exdir_path, openephys_rec)
+        #     print('Finished processing LFPs.')
+        # if not no_tracking:
+        #     print('Converting tracking from OpenEphys raw data to ".exdir"')
+        #     openephys.generate_tracking(exdir_path, openephys_rec)
             # TODO update
             # if shutter_channel is not None:
             #     ttl_times = openephys_file.digital_in_signals[0].times[
