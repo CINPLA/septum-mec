@@ -1,7 +1,5 @@
 print('Applying Mountainsort algorithm')
 
-sys.path.append(join(self.root, 'spikesorter_files', 'mountainsort_files'))
-
 import mlpy
 from shutil import copyfile
 

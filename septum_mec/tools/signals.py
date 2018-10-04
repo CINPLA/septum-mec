@@ -3,7 +3,7 @@ import os.path as op
 import numpy as np
 from datetime import datetime
 import quantities as pq
-from .utils import read_python
+from septum_mec.tools.utils import read_python
 
 
 def apply_CAR(anas, channels=None, car_type='mean', split_probe=None, copy_signal=True):
@@ -334,16 +334,127 @@ def find_frequency_range(anas, fs, freq_range, nchunks=30, chunksize=1*pq.s):
     return int(fpeak)*pq.Hz
 
 
-def save_geom_from_probefile(probefile, inter_group_dist=100,
+def save_geom_from_probefile(probefile, output_folder='.', inter_group_distance=100,
                              inter_electrode_distance=10):
     prb_dict = read_python(probefile)
     positions = []
     for grp_id, electrodes in prb_dict['channel_groups'].items():
         for i_e, elec in enumerate(electrodes['channels']):
-            pos = [0, (grp_id*inter_electrode_distance) + (i_e*inter_electrode_distance)]
+            pos = [0, (grp_id*inter_group_distance) + (i_e*inter_electrode_distance)]
             positions.append(pos)
-    print(positions)
+
+    # write csv probe file
+    with open(os.path.join(output_folder, 'geom.csv'), 'w') as f:
+        for pos in positions:
+            f.write(str(pos[0]))
+            f.write(',')
+            f.write(str(pos[1]))
+            f.write('\n')
+
+
+
+
 
 if __name__ == '__main__':
-    prbpath = '/home/mikkel/apps/expipe-project/septum-mec/septum_mec/probes/tetrodes32ch-klusta-oe.prb'
-    # save_geom_from_probefile(prbpath)
+    import mountainlab_pytools as mlpy
+    import pyopenephys
+    import json
+    from os.path import join
+    import time
+    import neo
+    import quantities
+
+    prbpath = '/home/alessio/Documents/Codes/expipe-project/septum-mec/septum_mec/probes/tetrodes32ch-klusta-oe.prb'
+    data = '/home/alessio/Documents/Data/Experiments/1809_test'
+    mountain_folder = join('.', 'mountain')
+
+    if not os.path.isdir(mountain_folder):
+        os.makedirs(mountain_folder)
+
+    # write geom.csv
+    pos = save_geom_from_probefile(prbpath, output_folder=mountain_folder)
+
+    # extract analog signals
+    # write mda file
+    rec = pyopenephys.File(data, prbpath).experiments[0].recordings[0]
+    signals = rec.analog_signals[0].signal
+    times = rec.analog_signals[0].times
+
+    minimum_spikes_per_cluster = 100
+    t_start = 0 * pq.s
+    t_stop = t_start + rec.duration
+
+    print('SAVING')
+    t_start_proc = time.time()
+    filename = join(mountain_folder, 'raw.mda')
+    mlpy.mdaio.writemda32(signals, filename)
+    processing_time = time.time() - t_start_proc
+    print('Elapsed saving time: ', processing_time)
+
+
+    # params
+    adjacency_radius = 50
+    samplerate = int(rec.sample_rate.rescale('Hz').magnitude)
+    detect_sign=-1
+
+    # run mountainsort routine:
+    import subprocess
+    try:
+        print('FILTERING')
+        t_start_proc = time.time()
+        subprocess.check_output(['ml-run-process', 'ephys.bandpass_filter',
+                                 '--inputs',
+                                 'timeseries:' + join(mountain_folder, 'raw.mda'),
+                                 '--outputs',
+                                 'timeseries_out:' + join(mountain_folder, 'filt.mda'),
+                                 '--parameters',
+                                 'samplerate:30000', 'freq_min:300', 'freq_max:6000'])
+        processing_time = time.time() - t_start_proc
+        print('Elapsed filtering time: ', processing_time)
+    except subprocess.CalledProcessError as e:
+        raise Exception(e.output)
+
+    try:
+        print('WHITENING')
+        t_start_proc = time.time()
+        subprocess.check_output(['ml-run-process', 'ephys.whiten',
+                                 '--inputs',
+                                 'timeseries:' + join(mountain_folder, 'filt.mda'),
+                                 '--outputs',
+                                 'timeseries_out:' + join(mountain_folder, 'pre.mda')])
+        processing_time = time.time() - t_start_proc
+        print('Elapsed whitening time: ', processing_time)
+    except subprocess.CalledProcessError as e:
+        raise Exception(e.output)
+
+    try:
+        print('MOUNTAINSORTING')
+        t_start_proc = time.time()
+        subprocess.check_output(['ml-run-process', 'ms4alg.sort',
+                                 '--inputs',
+                                 'timeseries:' + join(mountain_folder, 'pre.mda'),
+                                 'geom:' + join(mountain_folder, 'geom.csv'),
+                                 '--outputs',
+                                 'firings_out:' + join(mountain_folder, 'firings.mda'),
+                                 '--parameters',
+                                 'adjacency_radius:' + str(adjacency_radius),
+                                 'detect_sign:' + str(detect_sign)])
+        processing_time = time.time() - t_start_proc
+        print('Elapsed sorting time: ', processing_time)
+    except subprocess.CalledProcessError as e:
+        raise Exception(e.output)
+
+    print('PARSING')
+    firings = mlpy.mdaio.readmda(join(mountain_folder, 'firings.mda'))
+    spike_trains = []
+    clust_id, n_counts = np.unique(firings[2], return_counts=True)
+    ml_times = times[firings[1].astype(int)]
+
+    counts = 0
+    for clust, count in zip(clust_id, n_counts):
+        if count > minimum_spikes_per_cluster:
+            idx = np.where(firings[2] == clust)[0]
+            counts += len(idx)
+            spike_times = ml_times[idx]
+            spiketrain = neo.SpikeTrain(spike_times, t_start=t_start, t_stop=t_stop)
+            spike_trains.append(spiketrain)
