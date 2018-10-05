@@ -2,6 +2,7 @@ from expipecli.utils.plugin import IPlugin
 from . import analysis
 from . import openephys as OE
 from . import optogenetics
+from . import remote
 from septum_mec.imports import *
 
 def reveal():
@@ -28,3 +29,4 @@ class SeptumPlugin(IPlugin):
         analysis.attach_to_cli(cli)
         OE.attach_to_cli(openephys)
         optogenetics.attach_to_cli(opto)
+        remote.attach_to_cli(cli)
