@@ -56,56 +56,52 @@ def attach_to_cli(cli):
         server_data = server_data.replace('\\', '/')
         ########################## SEND  #######################################
         local_data = os.path.dirname(action_tools._get_local_path(fr, assert_exists=True))
-        # print('Initializing transfer of "' + local_data + '" to "' +
-        #       server_data + '"')
-        # try: # make directory for untaring
-        #     sftp_client.mkdir(server_data)
-        # except IOError:
-        #     pass
-        # print('Packing tar archive')
-        # shutil.make_archive(local_data, 'tar', local_data)
-        # scp_client.put(local_data + '.tar', server_data + '.tar',
-        #                recursive=False)
-        # try:
-        #     pbar[0].close()
-        # except Exception:
-        #     pass
-        # print('Unpacking tar archive')
-        # cmd = "tar -C " + server_data + " -xf " + server_data + '.tar'
-        # if not overwrite:
-        #     cmd += " -k --skip-old-files"
-        # else:
-        #     cmd += " -k --overwrite"
-        # ssh_execute(ssh, cmd)
-        # print('Deleting tar archives')
-        # sftp_client.remove(server_data + '.tar')
-        # os.remove(local_data + '.tar')
-        ######################## PROCESS #######################################
-        stdout, stderr = ssh_execute(ssh, "expipe")
-        print(stdout)
-        # ssh_execute(ssh, "expipe openephys process {}".format(action_id), get_pty=True, timeout=None)
-        # chan=ssh.invoke_shell()
-        # chan.send("expipe openephys process {}".format(action_id))
-        ######################### RETURN PROCESSED DATA #######################
-        # local_data = os.path.dirname(action_tools._get_local_path(fr, make=True))
-        # print('Initializing transfer of "' + server_data + '" to "' +
-        #               local_data + '"')
-        # print('Packing tar archive')
-        # exclude_statement = ""
-        # ssh_execute(ssh, "tar --exclude=acquisition -cf " +
-        #             server_data + '.tar ' + server_data)
-        # scp_client.get(server_data + '.tar', local_data + '.tar',
-        #                recursive=False)
-        # try:
-        #     pbar[0].close()
-        # except Exception:
-        #     pass
-        # print('Unpacking tar archive')
-        # untar(local_data + '.tar', server_data) # TODO merge with existing
-        # print('Deleting tar archives')
-        # os.remove(local_data + '.tar')
-        # sftp_client.remove(server_data + '.tar')
-        ####################### CLOSE UP #############################
+        print('Initializing transfer of "' + local_data + '" to "' +
+              server_data + '"')
+        try: # make directory for untaring
+            sftp_client.mkdir(server_data)
+        except IOError:
+            pass
+        print('Packing tar archive')
+        shutil.make_archive(local_data, 'tar', local_data)
+        scp_client.put(local_data + '.tar', server_data + '.tar',
+                       recursive=False)
+        try:
+            pbar[0].close()
+        except Exception:
+            pass
+        print('Unpacking tar archive')
+        cmd = "tar -C " + server_data + " -xf " + server_data + '.tar'
+        if not overwrite:
+            cmd += " -k --skip-old-files"
+        else:
+            cmd += " -k --overwrite"
+        ssh_execute(ssh, cmd)
+        print('Deleting tar archives')
+        sftp_client.remove(server_data + '.tar')
+        os.remove(local_data + '.tar')
+        ###################### PROCESS #######################################
+        ssh_execute(ssh, "expipe openephys process {}".format(action_id), get_pty=True, timeout=None)
+        ####################### RETURN PROCESSED DATA #######################
+        local_data = os.path.dirname(action_tools._get_local_path(fr, make=True))
+        print('Initializing transfer of "' + server_data + '" to "' +
+                      local_data + '"')
+        print('Packing tar archive')
+        exclude_statement = ""
+        ssh_execute(ssh, "tar --exclude=acquisition -cf " +
+                    server_data + '.tar ' + server_data)
+        scp_client.get(server_data + '.tar', local_data + '.tar',
+                       recursive=False)
+        try:
+            pbar[0].close()
+        except Exception:
+            pass
+        print('Unpacking tar archive')
+        untar(local_data + '.tar', server_data) # TODO merge with existing
+        print('Deleting tar archives')
+        os.remove(local_data + '.tar')
+        sftp_client.remove(server_data + '.tar')
+        ##################### CLOSE UP #############################
         ssh.close()
         sftp_client.close()
         scp_client.close()
