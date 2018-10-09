@@ -23,6 +23,7 @@ def attach_to_cli(cli):
                   help='Store temporary on local drive.',
                   )
     def generate_notebook(action_id, channel_group, no_local, run):
+        from septum_mec.analysis.utils import create_notebook
         project = expipe.get_project(PAR.PROJECT_ID)
         action = project.require_action(action_id)
         fr = action.require_filerecord()
@@ -30,7 +31,7 @@ def attach_to_cli(cli):
             exdir_path = action_tools._get_local_path(fr, assert_exists=True)
         else:
             exdir_path = fr.server_path
-        fname = action_tools.create_notebook(exdir_path)
+        fname = create_notebook(exdir_path)
         if run:
             subprocess.run(['jupyter', 'notebook', fname])
 

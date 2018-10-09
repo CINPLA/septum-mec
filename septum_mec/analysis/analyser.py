@@ -1,6 +1,6 @@
 from expipecli.utils.misc import lazy_import
 from expipe_plugin_cinpla.imports import *
-from septum_mec.tools import tracking as track_tools
+from septum_mec.analysis import tracking as track_tools
 from septum_mec.config.parameters import ANALYSIS_PARAMS
 
 @lazy_import
