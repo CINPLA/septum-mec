@@ -3,7 +3,7 @@ import os.path as op
 import numpy as np
 from datetime import datetime
 import quantities as pq
-from .utils import read_python
+from septum_mec.tools.utils import read_python
 
 
 def apply_CAR(anas, channels=None, car_type='mean', split_probe=None, copy_signal=True):
