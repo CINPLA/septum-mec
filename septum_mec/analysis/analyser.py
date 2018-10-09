@@ -1,15 +1,17 @@
 from expipecli.utils.misc import lazy_import
 from expipe_plugin_cinpla.imports import *
-
-@lazy_import
-def tracking():
-    import exana.tracking as tracking
-    return tracking
+from septum_mec.tools import tracking as track_tools
+from septum_mec.config.parameters import ANALYSIS_PARAMS
 
 @lazy_import
 def stimulus():
     import exana.stimulus as stimulus
     return stimulus
+
+@lazy_import
+def tracking():
+    import exana.tracking as tracking
+    return tracking
 
 @lazy_import
 def time_frequency():
@@ -71,15 +73,9 @@ class Analyser:
         self._exdir_object = exdir.File(exdir_path)
         processing = self._exdir_object['processing']
         if 'tracking' in processing:
-            try:
-                tracking_data = tracking.get_processed_tracking(
-                    exdir_path, par=params, return_rad=False)
-                self.x, self.y, self.t, self.ang, self.ang_t = tracking_data
-                mask = not (self.x <= 1e-15) & (self.y <= 1e-15)
-                self.x, self.y, self.t = self.x[mask], self.y[mask], self.t[mask]
-            except Exception as e:
-                print(str(e) + '. Unable to load tracking data, some analysis ' +
-                      'will not work.')
+            tracking_data = track_tools.get_processed_tracking(
+                exdir_path, par=params, return_rad=False)
+            self.x, self.y, self.t, self.ang, self.ang_t = tracking_data
         # NEO
         io = neo.ExdirIO(exdir_path)
         self.blk = io.read_block()
@@ -200,6 +196,7 @@ class Analyser:
                     fig = make_spatiality_overview(
                         self.x, self.y, self.t, self.ang,
                         self.ang_t, sptr=sptr,
+                        params=ANALYSIS_PARAMS,
                         acorr=acorr, G=G,
                         mask_unvisited=True,
                         title=None,
@@ -264,9 +261,9 @@ class Analyser:
             ax1.axes.xaxis.set_ticklabels([])
             ax1.axes.yaxis.set_ticklabels([])
             ax2.axis('off')
+            self.savefig(fpath, fig)
         except Exception as e:
             logger.exception('occupancy')
-        self.savefig(fpath, fig)
 
     # def spatial_stim_overview(self):
     #     if self.epoch is None:
@@ -610,44 +607,3 @@ class Analyser:
                     self.savefig(fpath, fig)
                 except Exception as e:
                     logger.exception('spike statistics')
-
-    def orient_tuning_overview(self):
-        try:
-            stim_epoch = stimulus.get_epoch(self.seg.epochs, "visual_stimulus")
-        except ValueError:
-            print("Could not find epoch of type 'visual_stimulus'")
-            raise
-        raw_dir = str(self._analysis.require_raw('orient_tuning_overview').directory)
-        logger = get_logger(os.path.join(raw_dir, 'exceptions.log'))
-        os.makedirs(raw_dir, exist_ok=True)
-        stim_off_epoch = stimulus.make_stimulus_off_epoch(stim_epoch)
-        off_rates = stimulus.compute_spontan_rate(self.chxs, stim_off_epoch)
-
-        stim_trials = stimulus.make_stimulus_trials(self.chxs, stim_epoch)
-        for nr, chx in enumerate(self.chxs):
-            group_id = chx.annotations['group_id']
-            if group_id not in self.channel_group:
-                continue
-            if not self._check_and_delete_figs(raw_dir, group_id):
-                continue
-            for u, unit in enumerate(chx.units):
-                cluster_group = unit.annotations.get('cluster_group') or 'noise'
-                if cluster_group != 'noise':
-                    print('Plotting orientation tuning, ' +
-                          'channel group {}'.format(group_id))
-                    unit_id = unit.annotations["cluster_id"]
-                    try:
-                        trials = stim_trials[chx.name][unit_id]
-                        off_rate = off_rates[chx.name][unit_id]
-
-                        fname = 'raster {} Unit {}'.format(chx.name, u)
-                        fpath = os.path.join(raw_dir, fname).replace(" ", "_")
-                        fig = stimulus.orient_raster_plots(trials)
-                        self.savefig(fpath, fig)
-
-                        fname = 'tuning {} Unit {}'.format(chx.name, u)
-                        fpath = os.path.join(raw_dir, fname).replace(" ", "_")
-                        fig = stimulus.plot_tuning_overview(trials, off_rate)
-                        self.savefig(fpath, fig)
-                    except Exception as e:
-                        logger.exception('orientation tuning')

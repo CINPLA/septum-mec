@@ -2,6 +2,7 @@ from septum_mec.imports import *
 from expipe_plugin_cinpla.tools import action as action_tools
 from septum_mec.analysis.analyser import Analyser
 from expipe_plugin_cinpla.tools import config
+from septum_mec.config.parameters import ANALYSIS_PARAMS
 
 
 def attach_to_cli(cli):
@@ -48,7 +49,7 @@ def attach_to_cli(cli):
                   multiple=True,
                   type=click.Choice(['spike-stat', 'spatial', 'all',
                                      'psd', 'spike-lfp', 'tfr', 'stim-stat',
-                                     'occupancy', 'orient-tuning']),
+                                     'occupancy']),
                   help='Analyse data.',
                   )
     @click.option('-t', '--tag',
@@ -103,24 +104,19 @@ def attach_to_cli(cli):
         action.tags.extend(list(kwargs['tag']) + list(rec_action.tags))
         action.location = rec_action.location or ''
         action.datetime = rec_action.datetime or ''
-        subjects = rec_action.subjects or []
-        action.subjects.extend(list(subjects))
-        action.messages.extend([{'message': m,
-                                 'user': user,
-                                 'datetime': datetime.now()}
-                               for m in kwargs['message']])
+        entities = rec_action.entities or []
+        action.entities.extend(list(entities))
+        for m in kwargs['message']:
+            action.create_message(text=m, user=user, datetime=datetime.now())
         fr = rec_action.require_filerecord()
         if not kwargs['no_local']:
             exdir_path = action_tools._get_local_path(fr)
         else:
             exdir_path = fr.server_path
-        action.require_module('software_version_control_git',
-                              contents=action_tools.get_git_info(),
-                              overwrite=(kwargs['overwrite'] or kwargs['skip']))
-        action.require_module('software_analysis_parameters',
-                              contents=PAR.ANALYSIS_PARAMS,
-                              overwrite=(kwargs['overwrite'] or kwargs['skip']))
-        an = Analyser(exdir_path, params=PAR.ANALYSIS_PARAMS,
+        # action.require_module('software_version_control_git',
+        #                       contents=action_tools.get_git_info(),
+        #                       overwrite=(kwargs['overwrite'] or kwargs['skip']))
+        an = Analyser(exdir_path, params=ANALYSIS_PARAMS,
                       unit_info=PAR.UNIT_INFO,
                       channel_group=kwargs['channel_group'],
                       no_local=kwargs['no_local'],
@@ -129,9 +125,9 @@ def attach_to_cli(cli):
         if any(arg in kwargs['analysis'] for arg in ['stim-stat', 'all']):
             print('Analysing stimulation statistics.')
             an.stimulation_statistics()
-        if any(arg in kwargs['analysis'] for arg in ['occupancy', 'all']):
-            print('Analysing occupancy.')
-            an.occupancy()
+        # if any(arg in kwargs['analysis'] for arg in ['occupancy', 'all']):
+        #     print('Analysing occupancy.')
+        #     an.occupancy()
         if any(arg in kwargs['analysis'] for arg in ['spatial', 'all']):
             print('Analysing spatial statistics.')
             an.spatial_overview()
@@ -147,13 +143,14 @@ def attach_to_cli(cli):
         if any(arg in kwargs['analysis'] for arg in ['tfr']):
             print('Analysing TFR.')
             an.tfr()
-        if any(arg in kwargs['analysis'] for arg in ['orient-tuning']):
-            print('Analysing orientation tuning.')
-            an.orient_tuning_overview()
+        # EXPIPE
+        action.require_module('software_analysis_parameters',
+                              contents=ANALYSIS_PARAMS,
+                              overwrite=(kwargs['overwrite'] or kwargs['skip']))
         for key, val in an.analysis_output.items():
             try:
                 mod = action.get_module(key).to_dict()
-            except NameError:
+            except KeyError:
                 mod = {}
             config.deep_update(mod, val)
             action.require_module(key, contents=mod,
@@ -177,21 +174,21 @@ def attach_to_cli(cli):
                   type=click.STRING,
                   help='Actions to include in the analysis.',
                   )
-    @click.option('-s', '--subjects',
+    @click.option('-i', '--entities',
                   multiple=True,
                   type=click.STRING,
-                  help='Subjects to sort the analysis.',
+                  help='entities to sort the analysis.',
                   )
     @click.option('-l', '--locations',
                   multiple=True,
                   type=click.STRING,
-                  help='Subjects to sort the analysis.',
+                  help='entities to sort the analysis.',
                   )
     @click.option('--overwrite',
                   is_flag=True,
                   help='Overwrite.',
                   )
-    def group_analysis(action_id, user, tags, overwrite, subjects,
+    def group_analysis(action_id, user, tags, overwrite, entities,
                        locations, actions):
         project = expipe.get_project(PAR.PROJECT_ID)
         analysis_action = project.require_action(action_id)
@@ -215,15 +212,15 @@ def attach_to_cli(cli):
                 raise ValueError('No tags in "' + action.id + '"')
             if not any(t in tags for t in action.tags):
                 continue
-            if len(subjects) > 0:
-                if not any(s in subjects for s in action.subjects):
+            if len(entities) > 0:
+                if not any(s in entities for s in action.entities):
                     continue
             if len(locations) > 0:
                 if action.location not in locations:
                     continue
             fr = action.require_filerecord()
             name = action.id.rstrip('-analysis')
-            analysis_action.subjects.extend(list(action.subjects))
+            analysis_action.entities.extend(list(action.entities))
             contents = {}
             for key, val in action.modules.items():
                 if 'channel_group' in key:
