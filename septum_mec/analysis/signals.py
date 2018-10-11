@@ -243,7 +243,8 @@ def create_klusta_prm(prb_path, nchan=32, fs=30000,
                       filter_order=3,
                       use_single_threshold=True,
                       threshold_strong_std_factor=4.5,
-                      threshold_weak_std_factor=2):
+                      threshold_weak_std_factor=2,
+                      ncpus=8):
     """Creates klusta .prm files, with spikesorting parameters
     Parameters
     ----------
@@ -293,7 +294,7 @@ def create_klusta_prm(prb_path, nchan=32, fs=30000,
                 "\n\tn_features_per_channel=3,\n\tpca_n_waveforms_max=10000,\n)")
         f.write('\n')
         f.write('\n')
-        f.write("klustakwik2 = dict(\n\tnum_starting_clusters=50,\n\tnum_cpus=8\n)")
+        f.write("klustakwik2 = dict(\n\tnum_starting_clusters=50,\n\tnum_cpus={}\n)".format(ncpus))
                 # "\n\tnum_cpus=4,)")
     return full_filename
 

@@ -103,6 +103,11 @@ def attach_to_cli(cli):
                   default=0,
                   help='TTL channel for shutter events to sync tracking',
                   )
+    @click.option('--ncpus-pr-group',
+                  type=click.INT,
+                  default=1,
+                  help='Number of cpus per channel group to use for clustering',
+                  )
     def process_openephys(action_id, prb_path, pre_filter,
                           klusta_filter, filter_low, filter_high,
                           filter_order, filter_function,
@@ -112,7 +117,7 @@ def attach_to_cli(cli):
                           common_ref, ground,
                           split_probe, no_local, openephys_path,
                           exdir_path, no_klusta, shutter_channel,
-                          no_preprocess, no_spikes, no_lfp, no_tracking):
+                          no_preprocess, no_spikes, no_lfp, no_tracking, ncpus_pr_group):
         settings = config.load_settings()['current']
         if not no_klusta:
             import klusta
@@ -205,6 +210,7 @@ def attach_to_cli(cli):
                     prb_path=path,
                     nchan=len(electrodes['channels']),
                     fs=fs,
+                    ncpus=ncpus_pr_group,
                     klusta_filter=klusta_filter,
                     filter_low=filter_low,
                     filter_high=filter_high,
@@ -217,7 +223,7 @@ def attach_to_cli(cli):
 
             processes = []
             import tempfile
-            for i, klusta_prm in enumerate(klusta_prms):
+            for i, klusta_prm in enumerate(klusta_prms[1:3]):
                 print('Running klusta, process {}'.format(i))
                 f = tempfile.TemporaryFile()
                 p = subprocess.Popen(
@@ -228,11 +234,13 @@ def attach_to_cli(cli):
             for p, f, i in processes:
                 p.wait()
                 f.seek(0)
-                if 'Error' in f:
-                    raise Exception(f.read())
+                f_txt = f.read()
+                print(f_txt)
+                #if 'Error' in f_txt:
+                #    raise Exception(f_txt)
                 logname = op.join(klusta_path, "klusta_log_{}.txt".format(i))
                 with open(logname, "wb") as logfile:
-                    logfile.write(f.read())
+                    logfile.write(f_txt)
                 f.close()
 
         if not no_spikes:
