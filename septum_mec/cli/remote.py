@@ -41,16 +41,13 @@ def attach_to_cli(cli):
         assert server in expipe.config.settings
         server_dict = expipe.config.settings.get(server)
         project = expipe.require_project(PAR.PROJECT_ID)
-        action = project.require_action(action_id)
+        action = project.actions[action_id]
         fr = action.require_filerecord()
 
-        host, user, pas, port = get_login(hostname=hostname,
-                                          username=username,
-                                          port=port,
-                                          server=server_dict)
-        ssh, scp_client, sftp_client, pbar = login(hostname=host,
-                                                   username=user,
-                                                   password=pas, port=port)
+        host, user, pas, port = get_login(
+            hostname=hostname, username=username, port=port, server=server_dict)
+        ssh, scp_client, sftp_client, pbar = login(
+            hostname=host, username=user, password=pas, port=port)
         serverpath = expipe.config.settings[server]['data_path']
         server_data = os.path.dirname(os.path.join(serverpath, fr.exdir_path))
         server_data = server_data.replace('\\', '/')
@@ -64,8 +61,8 @@ def attach_to_cli(cli):
             pass
         print('Packing tar archive')
         shutil.make_archive(local_data, 'tar', local_data)
-        scp_client.put(local_data + '.tar', server_data + '.tar',
-                       recursive=False)
+        scp_client.put(
+            local_data + '.tar', server_data + '.tar', recursive=False)
         try:
             pbar[0].close()
         except Exception:

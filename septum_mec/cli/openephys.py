@@ -196,7 +196,10 @@ def attach_to_cli(cli):
                 ana = anas[electrodes['channels'], :]
                 name = 'ch_grp_{}'.format(channel_group)
                 path = op.join(klusta_path, name)
-                val = {'channel_groups': {channel_group: electrodes}}
+                val = {
+                    'channel_groups': {
+                        channel_group: {
+                            'channels': [0, 1, 2, 3]}}}
                 write_python(path + '.prb', val, overwrite=True)
                 prm = sig_tools.create_klusta_prm(
                     prb_path=path,
@@ -227,7 +230,8 @@ def attach_to_cli(cli):
                 f.seek(0)
                 if 'Error' in f:
                     raise Exception(f.read())
-                with open(op.join(klusta_path,"klusta_log_{}.txt".format(i)), "wb") as logfile:
+                logname = op.join(klusta_path, "klusta_log_{}.txt".format(i))
+                with open(logname, "wb") as logfile:
                     logfile.write(f.read())
                 f.close()
 
