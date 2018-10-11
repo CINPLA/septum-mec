@@ -157,107 +157,107 @@ def attach_to_cli(cli):
             action.require_module(key, contents=mod,
                                   overwrite=True)
 
-    @cli.command('group-analyse',
-                 short_help=('Search and generate an analysis-action that' +
-                             ' represents and points to multiple dataset.'))
-    @click.argument('action-id', type=click.STRING)
-    @click.option('-u', '--user',
-                  type=click.STRING,
-                  help='The experimenter performing the analysis.',
-                  )
-    @click.option('-t', '--tags',
-                  multiple=True,
-                  type=click.STRING,
-                  help='Tags to sort the analysis.',
-                  )
-    @click.option('-a', '--actions',
-                  multiple=True,
-                  type=click.STRING,
-                  help='Actions to include in the analysis.',
-                  )
-    @click.option('-i', '--entities',
-                  multiple=True,
-                  type=click.STRING,
-                  help='entities to sort the analysis.',
-                  )
-    @click.option('-l', '--locations',
-                  multiple=True,
-                  type=click.STRING,
-                  help='entities to sort the analysis.',
-                  )
-    @click.option('--overwrite',
-                  is_flag=True,
-                  help='Overwrite.',
-                  )
-    def group_analysis(action_id, user, tags, overwrite, entities,
-                       locations, actions):
-        project = expipe.get_project(PAR.PROJECT_ID)
-        analysis_action = project.require_action(action_id)
-
-        analysis_action.type = 'Group-analysis'
-        user = user or PAR.USERNAME
-        if user is None:
-            raise ValueError('Please add user name')
-        if len(user) == 0:
-            raise ValueError('Please add user name')
-        analysis_action.users.append(user)
-        analysis_action.tags = list(tag)
-        # TODO this is slow, can omit loading all the modules for each action
-        for action in project.actions:
-            if action.type != 'Action-analysis':
-                continue
-            if len(actions) > 0:
-                if action.id not in actions:
-                    continue
-            if len(action.tags) == 0:
-                raise ValueError('No tags in "' + action.id + '"')
-            if not any(t in tags for t in action.tags):
-                continue
-            if len(entities) > 0:
-                if not any(s in entities for s in action.entities):
-                    continue
-            if len(locations) > 0:
-                if action.location not in locations:
-                    continue
-            fr = action.require_filerecord()
-            name = action.id.rstrip('-analysis')
-            analysis_action.entities.extend(list(action.entities))
-            contents = {}
-            for key, val in action.modules.items():
-                if 'channel_group' in key:
-                    contents[key] = val
-            analysis_action.require_module(name=name, contents=contents,
-                                           overwrite=overwrite)
-
-    @cli.command('spikesort', short_help='Spikesort with klustakwik.')
-    @click.argument('action-id', type=click.STRING)
-    @click.option('--no-local',
-                  is_flag=True,
-                  help='Store temporary on local drive.',
-                  )
-    def spikesort(action_id, no_local):
-        # anoying!!!!
-        import logging
-        from phycontrib.neo.model import NeoModel
-        logger = logging.getLogger('phy')
-        logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler(sys.stdout)
-        ch.setLevel(logging.DEBUG)
-        logger.addHandler(ch)
-
-        project = expipe.get_project(PAR.PROJECT_ID)
-        action = project.require_action(action_id)
-        fr = action.require_filerecord()
-        if not no_local:
-            exdir_path = action_tools._get_local_path(fr, assert_exists=True)
-        else:
-            exdir_path = fr.server_path
-        print('Spikesorting ', exdir_path)
-        model = NeoModel(exdir_path)
-        channel_groups = model.channel_groups
-        for channel_group in channel_groups:
-            if not channel_group == model.channel_group:
-                model.load_data(channel_group)
-            print('Sorting channel group {}'.format(channel_group))
-            clusters = model.cluster(np.arange(model.n_spikes), model.channel_ids)
-            model.save(spike_clusters=clusters)
+    # @cli.command('group-analyse',
+    #              short_help=('Search and generate an analysis-action that' +
+    #                          ' represents and points to multiple dataset.'))
+    # @click.argument('action-id', type=click.STRING)
+    # @click.option('-u', '--user',
+    #               type=click.STRING,
+    #               help='The experimenter performing the analysis.',
+    #               )
+    # @click.option('-t', '--tags',
+    #               multiple=True,
+    #               type=click.STRING,
+    #               help='Tags to sort the analysis.',
+    #               )
+    # @click.option('-a', '--actions',
+    #               multiple=True,
+    #               type=click.STRING,
+    #               help='Actions to include in the analysis.',
+    #               )
+    # @click.option('-i', '--entities',
+    #               multiple=True,
+    #               type=click.STRING,
+    #               help='entities to sort the analysis.',
+    #               )
+    # @click.option('-l', '--locations',
+    #               multiple=True,
+    #               type=click.STRING,
+    #               help='entities to sort the analysis.',
+    #               )
+    # @click.option('--overwrite',
+    #               is_flag=True,
+    #               help='Overwrite.',
+    #               )
+    # def group_analysis(action_id, user, tags, overwrite, entities,
+    #                    locations, actions):
+    #     project = expipe.get_project(PAR.PROJECT_ID)
+    #     analysis_action = project.require_action(action_id)
+    #
+    #     analysis_action.type = 'Group-analysis'
+    #     user = user or PAR.USERNAME
+    #     if user is None:
+    #         raise ValueError('Please add user name')
+    #     if len(user) == 0:
+    #         raise ValueError('Please add user name')
+    #     analysis_action.users.append(user)
+    #     analysis_action.tags = list(tag)
+    #     # TODO this is slow, can omit loading all the modules for each action
+    #     for action in project.actions:
+    #         if action.type != 'Action-analysis':
+    #             continue
+    #         if len(actions) > 0:
+    #             if action.id not in actions:
+    #                 continue
+    #         if len(action.tags) == 0:
+    #             raise ValueError('No tags in "' + action.id + '"')
+    #         if not any(t in tags for t in action.tags):
+    #             continue
+    #         if len(entities) > 0:
+    #             if not any(s in entities for s in action.entities):
+    #                 continue
+    #         if len(locations) > 0:
+    #             if action.location not in locations:
+    #                 continue
+    #         fr = action.require_filerecord()
+    #         name = action.id.rstrip('-analysis')
+    #         analysis_action.entities.extend(list(action.entities))
+    #         contents = {}
+    #         for key, val in action.modules.items():
+    #             if 'channel_group' in key:
+    #                 contents[key] = val
+    #         analysis_action.require_module(name=name, contents=contents,
+    #                                        overwrite=overwrite)
+    #
+    # @cli.command('spikesort', short_help='Spikesort with klustakwik.')
+    # @click.argument('action-id', type=click.STRING)
+    # @click.option('--no-local',
+    #               is_flag=True,
+    #               help='Store temporary on local drive.',
+    #               )
+    # def spikesort(action_id, no_local):
+    #     # anoying!!!!
+    #     import logging
+    #     from phycontrib.neo.model import NeoModel
+    #     logger = logging.getLogger('phy')
+    #     logger.setLevel(logging.DEBUG)
+    #     ch = logging.StreamHandler(sys.stdout)
+    #     ch.setLevel(logging.DEBUG)
+    #     logger.addHandler(ch)
+    #
+    #     project = expipe.get_project(PAR.PROJECT_ID)
+    #     action = project.require_action(action_id)
+    #     fr = action.require_filerecord()
+    #     if not no_local:
+    #         exdir_path = action_tools._get_local_path(fr, assert_exists=True)
+    #     else:
+    #         exdir_path = fr.server_path
+    #     print('Spikesorting ', exdir_path)
+    #     model = NeoModel(exdir_path)
+    #     channel_groups = model.channel_groups
+    #     for channel_group in channel_groups:
+    #         if not channel_group == model.channel_group:
+    #             model.load_data(channel_group)
+    #         print('Sorting channel group {}'.format(channel_group))
+    #         clusters = model.cluster(np.arange(model.n_spikes), model.channel_ids)
+    #         model.save(spike_clusters=clusters)
