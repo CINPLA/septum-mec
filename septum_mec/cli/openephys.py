@@ -140,14 +140,15 @@ def attach_to_cli(cli):
             openephys_exp = openephys_file.experiments[0]
             openephys_rec = openephys_exp.recordings[0]
             klusta_path = op.join(openephys_path, 'klusta')
-        if not no_preprocess:
-            # if not pre_filter and not klusta_filter:
-            #     pre_filter = True
-            # elif pre_filter and klusta_filter:
-            #     raise IOError('Choose either klusta-filter or pre-filter.')
+        if False in [no_preprocess, no_klusta]:
             anas = openephys_rec.analog_signals[0].signal
             fs = openephys_rec.sample_rate.magnitude
             nchan = anas.shape[0]
+        if not no_preprocess:
+            if not pre_filter and not klusta_filter:
+                pre_filter = True
+            elif pre_filter and klusta_filter:
+                raise IOError('Choose either klusta-filter or pre-filter.')
             if pre_filter:
                 anas = sig_tools.filter_analog_signals(anas, freq=[filter_low, filter_high],
                                              fs=fs, filter_type='bandpass',
@@ -173,6 +174,24 @@ def attach_to_cli(cli):
                 duplicate = [int(g) for g in ground]
                 anas = sig_tools.duplicate_bad_channels(
                     anas, duplicate, prb_path)
+
+            if action is not None:
+                prepro = {
+                    'common_ref': common_ref,
+                    'filter': {
+                        'pre_filter': pre_filter,
+                        'klusta_filter': klusta_filter,
+                        'filter_low': filter_low,
+                        'filter_high': filter_high,
+                    },
+                    'grounded_channels': ground,
+                    'probe_split': (str(split_chans[:split_probe]) +
+                                    str(split_chans[split_probe:]))
+                }
+                action.require_module(name='preprocessing', contents=prepro,
+                                      overwrite=True)
+
+        if not no_klusta:
             from septum_mec.tools.utils import read_python, write_python
             probe = read_python(prb_path)['channel_groups']
             klusta_prms = []
@@ -195,23 +214,7 @@ def attach_to_cli(cli):
                     threshold_weak_std_factor=threshold_weak_std_factor)
                 klusta_prms.append(prm)
                 sig_tools.save_binary_format(path, ana, spikesorter='klusta')
-            if action is not None:
-                prepro = {
-                    'common_ref': common_ref,
-                    'filter': {
-                        'pre_filter': pre_filter,
-                        'klusta_filter': klusta_filter,
-                        'filter_low': filter_low,
-                        'filter_high': filter_high,
-                    },
-                    'grounded_channels': ground,
-                    'probe_split': (str(split_chans[:split_probe]) +
-                                    str(split_chans[split_probe:]))
-                }
-                action.require_module(name='preprocessing', contents=prepro,
-                                      overwrite=True)
 
-        if not no_klusta:
             processes = []
             import tempfile
             for i, klusta_prm in enumerate(klusta_prms):
@@ -225,6 +228,8 @@ def attach_to_cli(cli):
             for p, f, i in processes:
                 p.wait()
                 f.seek(0)
+                if 'Error' in f:
+                    raise Exception(f.read())
                 with open(op.join(klusta_path,"klusta_log_{}.txt".format(i)), "wb") as logfile:
                     logfile.write(f.read())
                 f.close()
