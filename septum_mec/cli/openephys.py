@@ -120,7 +120,7 @@ def attach_to_cli(cli):
         action = None
         if exdir_path is None:
             project = expipe.get_project(PAR.PROJECT_ID)
-            action = project.require_action(action_id)
+            action = project.actions[action_id]
             fr = action.require_filerecord()
             if not no_local:
                 exdir_path = action_tools._get_local_path(fr)
@@ -174,7 +174,6 @@ def attach_to_cli(cli):
                 duplicate = [int(g) for g in ground]
                 anas = sig_tools.duplicate_bad_channels(
                     anas, duplicate, prb_path)
-
             if action is not None:
                 prepro = {
                     'common_ref': common_ref,
@@ -188,9 +187,7 @@ def attach_to_cli(cli):
                     'probe_split': (str(split_chans[:split_probe]) +
                                     str(split_chans[split_probe:]))
                 }
-                action.require_module(name='preprocessing', contents=prepro,
-                                      overwrite=True)
-
+                action.modules['preprocessing'] = prepro
         if not no_klusta:
             from septum_mec.tools.utils import read_python, write_python
             probe = read_python(prb_path)['channel_groups']

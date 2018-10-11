@@ -81,6 +81,7 @@ def attach_to_cli(cli):
         sftp_client.remove(server_data + '.tar')
         os.remove(local_data + '.tar')
         ###################### PROCESS #######################################
+        print('Processing on server')
         ssh_execute(ssh, "expipe openephys process {}".format(action_id), get_pty=True, timeout=None)
         ####################### RETURN PROCESSED DATA #######################
         local_data = os.path.dirname(action_tools._get_local_path(fr, make=True))
