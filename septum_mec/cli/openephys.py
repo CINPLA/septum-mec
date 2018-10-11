@@ -1,6 +1,6 @@
 from septum_mec.imports import *
 from expipe_plugin_cinpla.tools import action as action_tools
-from septum_mec.tools import signals as sig_tools
+from septum_mec.analysis import signals as sig_tools
 from datetime import timedelta
 from expipe_plugin_cinpla.tools import config
 import os.path as op

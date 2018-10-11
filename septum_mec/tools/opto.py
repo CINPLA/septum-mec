@@ -102,9 +102,11 @@ def populate_modules(action, params, no_intensity=False):
     assert len(name) == 1
     name = name[0]
     paradigm = action.require_module(name=name).to_dict()
-    if params['trigger_software'].lower() == 'openephys': # TODO what if we start using other stim in oe
+    if params['paradigm'].lower() == 'opto-inside':
         paradigm['stimulus_type']['value'] = 'positional'
-    if params['trigger_software'].lower() == 'matlab':
+    elif params['paradigm'].lower() == 'opto-outside':
+        paradigm['stimulus_type']['value'] = 'positional'
+    else:
         paradigm['stimulus_type']['value'] = 'train'
     action.require_module(name=name, contents=paradigm, overwrite=True)
 

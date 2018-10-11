@@ -51,6 +51,7 @@ def get_processed_tracking(exdir_path, par, return_rad=False):
     out : tuple
         Positions and head direction(x, y, t, ang, ang_t)
     """
+    from exana.tracking import head_direction
     import exdir
     exdir_group = exdir.File(exdir_path)
     processing = exdir_group['processing']
@@ -65,6 +66,8 @@ def get_processed_tracking(exdir_path, par, return_rad=False):
         x, y, t = select_best_position(x1, y1, t1, x2, y2, t2)
     else:
         x, y, t, ang, ang_t = x1, y1, t1, None, None
+    mask = (x > 0) & (y > 0)
+    x, y, t = x[mask], y[mask], t[mask]
     x, y, t = interp_filt_position(x, y, t, pos_fs=par['pos_fs'],
                                       f_cut=par['f_cut'])
     return x, y, t, ang, ang_t
@@ -157,6 +160,7 @@ def select_best_position(x1, y1, t1, x2, y2, t2, speed_filter=5 * pq.m / pq.s):
     speed_filter : None or quantities in m/s
         threshold filter for translational speed
     """
+    from exana.misc import is_quantities
     is_quantities([x1, y1, t1, x2, y2, t2], 'vector')
     x1, y1, t1, x2, y2, t2 = _cut_to_same_len(x1, y1, t1, x2, y2, t2)
     is_quantities(speed_filter, 'scalar')
@@ -207,6 +211,7 @@ def interp_filt_position(x, y, tm, box_xlen=1 * pq.m, box_ylen=1 * pq.m,
     out : angles, resized t
     """
     import scipy.signal as ss
+    from exana.misc import is_quantities
     assert len(x) == len(y) == len(tm), 'x, y, t must have same length'
     is_quantities([x, y, tm], 'vector')
     is_quantities([pos_fs, box_xlen, box_ylen, f_cut], 'scalar')
@@ -281,6 +286,7 @@ def velocity_threshold(x, y, t, threshold):
         1d vector of times at x, y positions
     threshold : float
     """
+    from exana.misc import is_quantities
     assert len(x) == len(y) == len(t), 'x, y, t must have same length'
     is_quantities([x, y, t], 'vector')
     is_quantities(threshold, 'scalar')

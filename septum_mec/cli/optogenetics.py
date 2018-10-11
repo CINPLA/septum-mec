@@ -13,11 +13,17 @@ def attach_to_cli(cli):
                   envvar=PAR.POSSIBLE_BRAIN_AREAS,
                   help='The anatomical brain-area of the optogenetic stimulus.',
                   )
-    @click.option('-t', '--tag',
+    @click.option('--paradigm',
                   multiple=True,
                   required=True,
                   callback=config.optional_choice,
-                  envvar=PAR.POSSIBLE_OPTO_TAGS,
+                  envvar=PAR.POSSIBLE_OPTO_PARADIGMS,
+                  help='The anatomical brain-area of the optogenetic stimulus.',
+                  )
+    @click.option('-t', '--tag',
+                  multiple=True,
+                  callback=config.optional_choice,
+                  envvar=PAR.POSSIBLE_TAGS,
                   help='The anatomical brain-area of the optogenetic stimulus.',
                   )
     @click.option('-m', '--message',
@@ -39,6 +45,7 @@ def attach_to_cli(cli):
                   help='Overwrite modules or not.',
                   )
     @click.option('--laser-id',
+                  required=True,
                   type=click.STRING,
                   help='A unique identifier of the laser.',
                   )
@@ -75,7 +82,7 @@ def attach_to_cli(cli):
     def parse_optogenetics(action_id, brain_area, no_local, overwrite,
                            io_channel, tag, message, laser_id, user,
                            no_modules, use_axona_cut, pulse_phasedur,
-                           pulse_period, no_intensity):
+                           pulse_period, no_intensity, paradigm):
         # TODO deafault none
         project = expipe.get_project(PAR.PROJECT_ID)
         action = project.require_action(action_id)
@@ -83,15 +90,15 @@ def attach_to_cli(cli):
         user = user or []
         if len(user) == 0:
             raise ValueError('Please add user name')
-        action.tags.extend(list(tag) + ['opto-' + brain_area])
+        action.tags.extend(list(tag) + ['opto-' + brain_area] + [paradigm])
         fr = action.require_filerecord()
         if not no_local:
             exdir_path = action_tools._get_local_path(fr)
         else:
             exdir_path = fr.server_path
         exdir_object = exdir.File(exdir_path)
-        if exdir_object['acquisition'].attrs['acquisition_system'] == 'Axona':
-            aq_sys = 'axona'
+        aq_sys = exdir_object['acquisition'].attrs['acquisition_system'].lower()
+        if aq_sys == 'axona':
             if use_axona_cut:
                 if pulse_phasedur == (None, None):
                     raise ValueError (
@@ -105,18 +112,18 @@ def attach_to_cli(cli):
             else:
                 params = opto_tools.generate_axona_opto(
                     exdir_path, io_channel, no_intensity=no_intensity)
-        elif exdir_object['acquisition'].attrs['acquisition_system'] == 'OpenEphys':
+        elif aq_sys == 'openephys' or aq_sys == 'rhythm fpga':
             aq_sys = 'openephys'
             params = opto_tools.generate_openephys_opto(exdir_path, io_channel)
         else:
             raise ValueError('Acquisition system not recognized')
+        params['paradigm'] = paradigm
         if not no_modules:
             params.update({'location': brain_area})
-            action_tools.generate_templates(action, 'opto_' + aq_sys,
-                               overwrite, git_note=None)
-            opto_tools.populate_modules(action, params,
-                                        no_intensity=no_intensity)
-            laser_id = laser_id or PAR.USER_PARAMS['laser_device'].get('id')
+            action_tools.generate_templates(
+                action, 'opto_' + aq_sys, overwrite)
+            opto_tools.populate_modules(
+                action, params, no_intensity=no_intensity)
             laser_name = PAR.USER_PARAMS['laser_device'].get('name')
             assert laser_id is not None
             assert laser_name is not None

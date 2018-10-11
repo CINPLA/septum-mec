@@ -2,11 +2,11 @@
 "POSSIBLE_BRAIN_AREAS": [
     "MECR", "MECL", "MS"
 ],
-"POSSIBLE_OPTO_TAGS": [
+"POSSIBLE_OPTO_PARADIGMS": [
     "opto-inside", "opto-outside", "opto-train"
 ],
 "POSSIBLE_LOCATIONS": [
-    "room2", "room1"
+    "ibv-room2", "ibv-room1", "imb-room1"
 ],
 "POSSIBLE_CELL_LINES": [
     "gad1-cre", "wild-type"
