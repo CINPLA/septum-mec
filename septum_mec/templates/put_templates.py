@@ -16,4 +16,9 @@ for root, dirs, files in os.walk('templates'):
             except:
                 print(fname)
                 raise
-        project.require_template(name=name, contents=result)
+        result.update({
+            'name': name,
+            'identifier': name
+        })
+        print('Uploading template', name)
+        project.create_template(name=name, contents=result, overwrite=True)

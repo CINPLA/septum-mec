@@ -5,7 +5,7 @@ def generate_axona_opto(exdir_path, io_channel=8, no_intensity=False,
                         **annotations):
     exdir_object = exdir.File(exdir_path)
     session = exdir_object['acquisition'].attrs['axona_session']
-    param = extract_laser_pulse(
+    param = extract_laser_params(
         os.path.join(str(exdir_object['acquisition'].directory), session),
         no_intensity=no_intensity)
     if annotations:
@@ -41,23 +41,35 @@ def generate_axona_opto_from_cut(exdir_path, pulse_phasedur, io_channel=8):
     return param
 
 
-def generate_openephys_opto(exdir_path, io_channel, **attrs):
+def generate_openephys_opto(exdir_path, io_channel, pulsepalfile):
     exdir_object = exdir.File(exdir_path)
     session = exdir_object['acquisition'].attrs['openephys_session']
     openephys_path = os.path.join(str(exdir_object['acquisition'].directory), session)
-    param = extract_laser_pulse(openephys_path)
+
     openephys_file = pyopenephys.File(openephys_path)
-    if attrs:
-        param.update(attrs)
-    times = openephys_file.digital_in_signals[0].times[io_channel]
+    openephys_exp = openephys_file.experiments[0]
+    openephys_rec = openephys_exp.recordings[0]
+    events = openephys_rec.events[0]
+    assert events.processor.lower() == 'rhythm_fpga'
+    assert io_channel in events.channels, 'Unable to find "io channel"'
+    ch_mask = events.channels == io_channel
+    rising_mask = events.channel_states == 1
+    falling_mask = events.channel_states == -1
+    times = events.times[rising_mask & ch_mask]
     if len(times) == 0:
-        raise ValueError('No recorded TTL signals on io channel ' +
-                         str(io_channel))
-    durations = pq.Quantity(np.array([param['pulse_phasedur']] * len(times)),
-                            param['pulse_phasedur'].units)
+        raise ValueError(
+            'No recorded TTL signals on io channel ' + str(io_channel))
+    off_times = events.times[falling_mask & ch_mask]
+    durations = off_times - times
+    if pulsepalfile is not None:
+        param = extract_laser_params(openephys_path, pulsepalfile=pulsepalfile)
+    else:
+        param = get_pulse_param_from_settings(
+            openephys_exp.settings['SIGNALCHAIN'])
+        param['pulse_url'] = openephys_path
     generate_epochs(exdir_path=exdir_path, times=times, durations=durations,
                     start_time=0 * pq.s,
-                    stop_time=openephys_file.duration)
+                    stop_time=openephys_rec.duration)
     return param
 
 
@@ -65,60 +77,51 @@ def populate_modules(action, params, no_intensity=False):
     name = [n for n in action.modules.keys() if 'pulse_pal_settings' in n]
     assert len(name) == 1
     name = name[0]
-    pulse_dict = action.require_module(name=name).to_dict()
-    pulse_dict['stimulus_file_url']['value'] = '/'.join(params['pulse_url'].split('/')[4:])
-    pulse_dict['pulse_period'] = params['pulse_period']
-    pulse_dict['pulse_phase_duration'] = params['pulse_phasedur']
-    pulse_dict['pulse_frequency'] = params['pulse_freq']
-    pulse_dict['trigger_software']['value'] = params['trigger_software']
-    action.require_module(name=name, contents=pulse_dict,
-                          overwrite=True)
+    action.modules[name]['stimulus_file_url']['value'] = '/'.join(params['pulse_url'].split('/')[4:])
+    action.modules[name]['pulse_period'] = params['pulse_period']
+    action.modules[name]['pulse_phase_duration'] = params['pulse_phasedur']
+    action.modules[name]['pulse_frequency'] = params['pulse_freq']
+    action.modules[name]['trigger_software']['value'] = params['trigger_software']
     if not no_intensity:
         name = [n for n in action.modules.keys() if 'laser_settings' in n]
         assert len(name) == 1
         name = name[0]
-        laser_dict = action.require_module(name=name).to_dict()
-        laser_dict['intensity_file_url']['value'] = '/'.join(params['laser_url'].split('/')[4:])
+        action.modules[name]['intensity_file_url']['value'] = '/'.join(params['laser_url'].split('/')[4:])
         laser_mask = params['laser_intensity'] > .1 * pq.mW
         avg = params['laser_intensity'][laser_mask].mean().rescale('mW')
         std = params['laser_intensity'][laser_mask].std().rescale('mW')
-        laser_dict['intensity'] = pq.UncertainQuantity(avg, uncertainty=std)
-        timestring = datetime.strftime(params['laser_dtime'],
-                                       expipe.io.core.datetime_format)
-        laser_dict['intensity_date_time'] = timestring
-        laser_dict['intensity_info'] = params['laser_info']
-        action.require_module(name=name, contents=laser_dict, overwrite=True)
+        action.modules[name]['intensity'] = pq.UncertainQuantity(avg, uncertainty=std)
+        timestring = datetime.strftime(
+            params['laser_dtime'], expipe.io.core.datetime_format)
+        action.modules[name]['intensity_date_time'] = timestring
+        action.modules[name]['intensity_info'] = params['laser_info']
 
     name = [n for n in action.modules.keys()
             if 'optogenetics_anatomical_location' in n]
     assert len(name) == 1
     name = name[0]
-    loc_mod = action.require_module(name=name)
-    loc_dict = loc_mod.to_dict()
-    loc_dict['location']['value'] = params['location']
-    action.require_module(name=name, contents=loc_dict, overwrite=True)
+    action.modules[name]['location']['value'] = params['location']
 
     name = [n for n in action.modules.keys() if 'optogenetics_paradigm' in n]
     assert len(name) == 1
     name = name[0]
-    paradigm = action.require_module(name=name).to_dict()
     if params['paradigm'].lower() == 'opto-inside':
-        paradigm['stimulus_type']['value'] = 'positional'
+        action.modules[name]['stimulus_type']['value'] = 'positional'
     elif params['paradigm'].lower() == 'opto-outside':
-        paradigm['stimulus_type']['value'] = 'positional'
+        action.modules[name]['stimulus_type']['value'] = 'positional'
     else:
-        paradigm['stimulus_type']['value'] = 'train'
-    action.require_module(name=name, contents=paradigm, overwrite=True)
+        action.modules[name]['stimulus_type']['value'] = 'train'
 
 
-def extract_laser_pulse(acquisition_directory, no_intensity=False):
+def extract_laser_params(acquisition_directory, pulsepalfile=None, no_intensity=False):
     # we only need to look up the begining of the file name as we look in exdir
-    paths = glob.glob(os.path.join(acquisition_directory, 'PulsePalProgram*'))
-    if len(paths) == 0:
-        raise ValueError('No Pulse Pal program found.')
-    if len(paths) > 1:
-        raise ValueError('Multiple Pulse Pal programs found.')
-    pulsepalpath = paths[0]
+    if pulsepalfile is None:
+        paths = glob.glob(os.path.join(acquisition_directory, 'PulsePalProgram*'))
+        if len(paths) == 0:
+            raise ValueError('No Pulse Pal program found.')
+        if len(paths) > 1:
+            raise ValueError('Multiple Pulse Pal programs found.')
+        pulsepalfile = paths[0]
     # laserpath
     if not no_intensity:
         paths = glob.glob(os.path.join(acquisition_directory, 'PM100*'))
@@ -237,3 +240,25 @@ def read_pulse_pal_mat(fname):
                 if name.size > 0:
                     trigger_params[name[0]][chan[0]] = chan_val[0]
     return output_params, trigger_params
+
+
+def get_pulse_param_from_settings(settings, channel=1):
+    for s in settings:
+        if 'PROCESSOR' in s:
+            for p in s['PROCESSOR']:
+                if p['@name'] == 'Sinks/Pulse Pal':
+                    pp = p['PulsePalOutput']
+    try:
+        result = pp['Channel_{}'.format(channel)]
+    except NameError as e:
+        raise NameError(
+            str(e) + '. Unable to retrieve from Pulse Pal settings in OpenEphys')
+    period = float(result['@interpulse']) * pq.ms
+    par = {
+        'pulse_phasedur': float(result['@phase1']) * pq.ms,
+        'pulse_freq': (1 / period).rescale('Hz'),
+        'pulse_period': period,
+        'pulse_traindur': float(result['@trainduration']) * pq.ms,
+        'trigger_software': "OpenEphys"
+    }
+    return par

@@ -1,6 +1,6 @@
 {
 "POSSIBLE_BRAIN_AREAS": [
-    "MECR", "MECL", "MS"
+    "mecr", "mecl", "ms"
 ],
 "POSSIBLE_OPTO_PARADIGMS": [
     "opto-inside", "opto-outside", "opto-train"
@@ -16,7 +16,7 @@
 ],
 "POSSIBLE_TAGS": [
     "no", "yes", "maybe",
-    "GC", "PC", "BC", "SC", "HD", "TC", "theta", "baseline",
+    "gc", "pc", "bc", "sc", "hd", "tc", "theta", "baseline",
     "AAV5-syn-hChR2-EYFP", "AAV8-hsyn-eChR2(H134R)-EYFP",
     "AAV8-Ef1a-DIO-eChr2(H134R)-EYFP", "baseline"
 ],
@@ -44,8 +44,9 @@
         "hardware_microdrive_optetrode"
     ],
     "opto_axona": [
-        "laser_settings",
-        "pulse_pal_settings",
+        "hardware_blue_laser",
+        "hardware_laser_settings",
+        "software_pulse_pal_settings",
         "optogenetics_paradigm",
         "optogenetics_anatomical_location",
         "hardware_axona_optogenetics",
@@ -66,8 +67,9 @@
         "hardware_microdrive_optetrode"
     ],
     "opto_openephys": [
-        "laser_settings",
-        "pulse_pal_settings",
+        "hardware_blue_laser",
+        "hardware_laser_settings",
+        "software_pulse_pal_settings",
         "optogenetics_paradigm",
         "optogenetics_anatomical_location",
         "hardware_openephys_optogenetics",

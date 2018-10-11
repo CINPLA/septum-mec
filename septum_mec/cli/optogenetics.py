@@ -14,7 +14,6 @@ def attach_to_cli(cli):
                   help='The anatomical brain-area of the optogenetic stimulus.',
                   )
     @click.option('--paradigm',
-                  multiple=True,
                   required=True,
                   callback=config.optional_choice,
                   envvar=PAR.POSSIBLE_OPTO_PARADIGMS,
@@ -32,7 +31,7 @@ def attach_to_cli(cli):
                   help='Add message, use "text here" for sentences.',
                   )
     @click.option('--io-channel',
-                  default=8,
+                  default=1,
                   type=click.INT,
                   help='TTL input channel. Default is 8 (axona tetrode 9)',
                   )
@@ -79,18 +78,27 @@ def attach_to_cli(cli):
                   is_flag=True,
                   help='Use Axona cut file for input registration.',
                   )
+    @click.option('--laser-name',
+                  default='hardware_blue_laser',
+                  type=click.STRING,
+                  help='A name of the laser.',
+                  )
+    @click.option('--pulsepalfile',
+                  type=click.Path(exists=True),
+                  help='Find parameters from PulsePal params file.',
+                  )
     def parse_optogenetics(action_id, brain_area, no_local, overwrite,
                            io_channel, tag, message, laser_id, user,
                            no_modules, use_axona_cut, pulse_phasedur,
-                           pulse_period, no_intensity, paradigm):
+                           pulse_period, no_intensity, paradigm, pulsepalfile,
+                           laser_name):
         # TODO deafault none
         project = expipe.get_project(PAR.PROJECT_ID)
-        action = project.require_action(action_id)
+        action = project.actions[action_id]
         user = user or PAR.USERNAME
-        user = user or []
-        if len(user) == 0:
+        if user is None:
             raise ValueError('Please add user name')
-        action.tags.extend(list(tag) + ['opto-' + brain_area] + [paradigm])
+        action.tags.extend(list(tag) + ['opto-' + brain_area] + list(paradigm))
         fr = action.require_filerecord()
         if not no_local:
             exdir_path = action_tools._get_local_path(fr)
@@ -104,17 +112,17 @@ def attach_to_cli(cli):
                     raise ValueError (
                         'You need to provide pulse phase duration, e.g.' +
                         '"pulse-phasedur 10 ms" to use Axona cut')
-                pulse_phasedur = pq.Quantity(pulse_phasedur[0],
-                                             pulse_phasedur[1])
-                params = opto_tools.generate_axona_opto_from_cut(exdir_path,
-                                                      pulse_phasedur,
-                                                      io_channel)
+                pulse_phasedur = pq.Quantity(
+                    pulse_phasedur[0], pulse_phasedur[1])
+                params = opto_tools.generate_axona_opto_from_cut(
+                    exdir_path, pulse_phasedur, io_channel)
             else:
                 params = opto_tools.generate_axona_opto(
                     exdir_path, io_channel, no_intensity=no_intensity)
         elif aq_sys == 'openephys' or aq_sys == 'rhythm fpga':
             aq_sys = 'openephys'
-            params = opto_tools.generate_openephys_opto(exdir_path, io_channel)
+            params = opto_tools.generate_openephys_opto(
+                exdir_path, io_channel, pulsepalfile)
         else:
             raise ValueError('Acquisition system not recognized')
         params['paradigm'] = paradigm
@@ -124,17 +132,10 @@ def attach_to_cli(cli):
                 action, 'opto_' + aq_sys, overwrite)
             opto_tools.populate_modules(
                 action, params, no_intensity=no_intensity)
-            laser_name = PAR.USER_PARAMS['laser_device'].get('name')
-            assert laser_id is not None
-            assert laser_name is not None
-            laser = action.require_module(name=laser_name).to_dict()
-            laser['device_id'] = {'value': laser_id}
-            action.require_module(name=laser_name, contents=laser,
-                                  overwrite=True)
-        action.messages.extend([{'message': m,
-                                 'user': user,
-                                 'datetime': datetime.now()}
-                               for m in message])
+            action.modules[laser_name]['device_id'] = {'value': laser_id}
+
+        for m in message:
+            action.create_message(text=m, user=user, datetime=datetime.now())
 
     @cli.command('parse-files', short_help='Parse optogenetics files.')
     @click.argument('action-id', type=click.STRING)
