@@ -200,7 +200,7 @@ def attach_to_cli(cli):
             for channel_group, electrodes in probe.items():
                 ana = anas[electrodes['channels'], :]
                 name = 'ch_grp_{}'.format(channel_group)
-                path = op.join(klusta_path, name)
+                path = op.join(klusta_path, name, name)
                 val = {
                     'channel_groups': {
                         channel_group: {
