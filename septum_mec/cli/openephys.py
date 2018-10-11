@@ -223,21 +223,17 @@ def attach_to_cli(cli):
 
             processes = []
             import tempfile
-            for i, klusta_prm in enumerate(klusta_prms[1:3]):
+            for i, klusta_prm in enumerate(klusta_prms):
                 print('Running klusta, process {}'.format(i))
                 f = tempfile.TemporaryFile()
                 p = subprocess.Popen(
                         ['klusta', klusta_prm, '--overwrite'], stdout=f,
                         cwd=klusta_path)
                 processes.append((p, f, i))
-
             for p, f, i in processes:
                 p.wait()
                 f.seek(0)
                 f_txt = f.read()
-                print(f_txt)
-                #if 'Error' in f_txt:
-                #    raise Exception(f_txt)
                 logname = op.join(klusta_path, "klusta_log_{}.txt".format(i))
                 with open(logname, "wb") as logfile:
                     logfile.write(f_txt)

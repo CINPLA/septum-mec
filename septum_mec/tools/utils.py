@@ -16,7 +16,7 @@ def write_python(path, contents, overwrite=False):
     assert isinstance(contents, dict)
     dir_path = op.dirname(path)
     if not op.exists(dir_path):
-        os.mkdir(dir_path)
+        os.makedirs(dir_path, exist_ok=True)
     assert op.isdir(dir_path)
     if not overwrite:
         assert not op.exists(path)
