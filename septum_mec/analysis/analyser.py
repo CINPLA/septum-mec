@@ -420,7 +420,10 @@ class Analyser:
                     logger.exception('stim micro')
 
     def spike_lfp_coherence(self, xlim=[4, 16], color='b',
-                            srch=[6, 10], show_max=False): # TODO plots everything twice
+                            srch=[6, 10], show_max=False, spike_lfp_link='one2all'): # TODO plots everything twice
+        """
+        spike_lfp_link : {spike_group: lfp_group}
+        """
         # from .signal_tools import downsample_250
         from matplotlib.ticker import MaxNLocator
         from exana.misc.tools import normalize
@@ -428,6 +431,13 @@ class Analyser:
         os.makedirs(raw_dir, exist_ok=True)
         starts = [self.blk.segments[0].t_start]
         stops = [self.blk.segments[0].t_stop]
+        group_ids = [chx.annotations['group_id'] for chx in self.chxs]
+        if spike_lfp_link is 'one2one':
+            spike_lfp_link = {i: i for i in group_ids}
+        elif spike_lfp_link is 'one2all':
+            spike_lfp_link = {i: group_ids for i in group_ids}
+        else:
+            raise ValueError('"spike_lfp_link" must be either "one2one" or "one2all"')
         if self.epoch is not None:
             epo_over = stimulus.epoch_overview(self.epoch,
                                       np.median(np.diff(self.epoch.times)))
@@ -447,11 +457,6 @@ class Analyser:
                 continue
             print('Plotting spike lfp coherence, ' +
                   'channel group {}'.format(group_id))
-
-            if group_id < 4:
-                id_list = range(4)
-            else:
-                id_list = range(4, 8)
 
             for u, unit in enumerate(chx.units):
                 cluster_group = unit.annotations.get('cluster_group') or 'noise'
@@ -476,18 +481,21 @@ class Analyser:
                     sptr = unit.spiketrains[0]
                     sptr = sptr[(sptr.times > t_start) & (sptr.times < t_stop)]
 
-                    sliced_anas = []
                     sampling_rates = [ana.sampling_rate
                                       for ana in self.seg.analogsignals]
                     if len(np.unique(sampling_rates)) > 1:
                         warnings.warn('Found multiple sampling rates, selecting minimum')
                     target_rate = min(sampling_rates)
-                    # only get anas from id list
-                    anas = [ana for ana in self.seg.analogsignals
-                            if ana.sampling_rate == target_rate and
-                            ana.channel_index.annotations['group_id'] in id_list]
 
-                    for ana in anas:
+                    sliced_anas = []
+                    anas = []
+                    for ana in self.seg.analogsignals:
+                        ana_id = ana.channel_index.annotations['group_id']
+                        if ana_id not in spike_lfp_link[group_id]:
+                            continue
+                        if ana.sampling_rate != target_rate:
+                            continue
+                        anas.append(ana)
                         mask = (ana.times > t_start) & (ana.times < t_stop)
                         sliced_anas.append(
                             neo.AnalogSignal(
@@ -496,6 +504,8 @@ class Analyser:
                                 t_start=0 * pq.s
                             )
                         )
+                    if len(anas) == 0:
+                        raise ValueError('Unable to find LFP for channel group {}'.format(group_id))
                     ana_arr = np.array([np.reshape(ana.magnitude, len(ana))
                                         for ana in anas])
                     ana_arr = neo.AnalogSignal(signal=ana_arr.T * anas[0].units,
@@ -519,12 +529,13 @@ class Analyser:
                     # lfp psd
                     # TODO select proper lfp signal
                     ax_ana_spec = fig.add_subplot(gs[1])
-                    time_frequency.plot_psd(sliced_anas, color=color, xlim=xlim,
-                             mark_max=False, nperseg=2048, ylim=None,
-                             fcn=lambda inp: normalize(inp, mode='zscore'),
-                             title=None, ax=ax_ana_spec, xlabel=False,
-                             ylabel=None, max_power=show_max, srch=srch,
-                             legend=False)
+                    time_frequency.plot_psd(
+                        sliced_anas, color=color, xlim=xlim,
+                        mark_max=False, nperseg=2048, ylim=None,
+                        fcn=lambda inp: normalize(inp, mode='zscore'),
+                        title=None, ax=ax_ana_spec, xlabel=False,
+                        ylabel=None, max_power=show_max, srch=srch,
+                        legend=True)
 
                     plt.setp(ax_ana_spec.get_xticklabels(), visible=False)
                     ax_ana_spec.yaxis.set_major_locator(MaxNLocator(prune='both'))
