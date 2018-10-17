@@ -1,0 +1,5 @@
+current: &id001
+  probe: /nird/home/bjornmik/nobackup/septum-mec/septum_mec/probes/tetrodes32ch-klusta-oe.prb
+  config: /nird/home/bjornmik/.config/expipe/septum-mec-config.yaml
+  project: septum-mec
+septum-mec: *id001

@@ -1,0 +1,17 @@
+data_path: /home/mikkel/expipe_data
+#data_path: /media/nird/NORSTORE_OSL_DISK/NS9048K/server
+username: Mikkel Elle Lepperød
+database_version: 0
+nird:
+  data_path: /projects/NS9048K/NORSTORE_OSL_DISK/NS9048K/server
+  username: username
+  password: password
+  hostname: login.nird.sigma2.no
+firebase:
+  email: email
+  password: password
+  config:
+    apiKey: AIzaSyA2pbdoUOXD_mrSKgvZAAhOYyCBgEmxEaE
+    authDomain: septum-mec.firebaseapp.com
+    databaseURL: https://septum-mec.firebaseio.com
+    storageBucket: septum-mec.appspot.com

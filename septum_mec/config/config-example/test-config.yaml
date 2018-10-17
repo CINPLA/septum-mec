@@ -1,0 +1,10 @@
+allow_tests: true
+data_path: '/nird/home/bjornmik/tmp/expipe_data'
+firebase:
+  email: debug-bot@cinpla.com
+  password: noneed
+  config:
+    apiKey: AIzaSyBnbsraKxrO8zv1qVZeAvJR4fEWzExQhOM
+    authDomain: expipe-debug.firebaseapp.com
+    databaseURL: https://expipe-debug.firebaseio.com
+    storageBucket: expipe-debug.appspot.com
