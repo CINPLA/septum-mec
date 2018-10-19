@@ -83,6 +83,7 @@ def populate_modules(action, params, no_intensity=False):
     action.modules[name]['pulse_frequency'] = params['pulse_freq']
     action.modules[name]['trigger_software']['value'] = params['trigger_software']
     if not no_intensity:
+        assert 'laser_url' in params, 'add laser file or use --no-intensity'
         name = [n for n in action.modules.keys() if 'laser_settings' in n]
         assert len(name) == 1
         name = name[0]

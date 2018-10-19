@@ -204,13 +204,15 @@ class Analyser:
                         rate_map=rate_map,
                         spike_size=1.)
                     self.savefig(fpath, fig)
-
-                ang_bin, ang_rate = tracking.head_direction_rate(
-                    sptr, self.ang,
-                    self.ang_t,
-                    binsize=self.par['ang_binsize'])
-                mean_ang, mean_vec_len = tracking.head_direction_stats(ang_bin,
-                                                                 ang_rate)
+                if (self.ang_t, self.ang) != (None, None):
+                    ang_bin, ang_rate = tracking.head_direction_rate(
+                        sptr, self.ang,
+                        self.ang_t,
+                        binsize=self.par['ang_binsize'])
+                    mean_ang, mean_vec_len = tracking.head_direction_stats(ang_bin,
+                                                                     ang_rate)
+                else:
+                    mean_vec_len = None
                 px = tracking.prob_dist(self.x, self.y, rate_bins)
                 analysis_output = {
                     'information_rate': tracking.information_rate(rate_map, px),
