@@ -576,34 +576,44 @@ class Analyser:
                 continue
             print('Analysing spike statistics, ' +
                   'channel group {}'.format(group_id))
+            spiketrains = [unit.spiketrains[0] for unit in chx.units]
             for u, unit in enumerate(chx.units):
                 cluster_group = unit.annotations.get('cluster_group') or 'noise'
                 if cluster_group.lower() == 'noise':
                     continue
                 if unit.name is None:
                     unit.name = 'cluster_{}'.format(unit.annotations['cluster_id'])
-                sptr = unit.spiketrains[0]
+                sptr = spiketrains[u]
+                colors = ['lightgray'] * len(spiketrains)
+                colors[u] = 'b'
+                zorders = [0] * len(spiketrains)
+                zorders[u] = 1
                 try:
                     fname = '{} {}'.format(chx.name, unit.name)
                     fpath = os.path.join(raw_dir, fname).replace(" ", "_")
                     fig = plt.figure()
                     nrc = sptr.waveforms.shape[1]
-                    gs = gridspec.GridSpec(2*nrc+4, 2*nrc+4)
-                    waveform.plot_waveforms(sptr=sptr, color=color, fig=fig, gs=gs[:nrc+1, :nrc+1])
-                    waveform.plot_amp_clusters([sptr], colors=[color], fig=fig, gs=gs[:nrc+1, nrc+2:])
+                    gs = gridspec.GridSpec(2 * nrc + 4, 2 * nrc + 4)
+                    waveform.plot_waveforms(
+                        sptr=sptr, color=color, fig=fig, gs=gs[:nrc+1, :nrc+1])
+                    waveform.plot_amp_clusters(
+                        spiketrains, colors=colors, fig=fig,
+                        gs=gs[:nrc+1, nrc+2:], zorders=zorders)
                     bin_width = self.par['corr_bin_width'].rescale('s').magnitude
                     limit = self.par['corr_limit'].rescale('s').magnitude
-                    count, bins = statistics.correlogram(t1=sptr.times.magnitude, t2=None,
-                                              bin_width=bin_width, limit=limit,
-                                              auto=True)
+                    count, bins = statistics.correlogram(
+                        t1=sptr.times.magnitude, t2=None, bin_width=bin_width,
+                        limit=limit, auto=True)
                     ax_cor = fig.add_subplot(gs[nrc+3:, :nrc+1])
                     ax_cor.bar(bins[:-1] + bin_width / 2., count, width=bin_width,
                                color=color)
                     ax_cor.set_xlim([-limit, limit])
 
                     ax_isi = fig.add_subplot(gs[nrc+3:, nrc+2:])
-                    statistics.plot_isi_hist(sptr.times, alpha=1, ax=ax_isi, binsize=self.par['isi_binsize'],
-                                  time_limit=self.par['isi_time_limit'], color=color, )
+                    statistics.plot_isi_hist(
+                        sptr.times, alpha=1, ax=ax_isi,
+                        binsize=self.par['isi_binsize'],
+                        time_limit=self.par['isi_time_limit'], color=color)
                     self.savefig(fpath, fig)
                 except Exception as e:
                     logger.exception('spike statistics')

@@ -145,17 +145,16 @@ def attach_to_cli(cli):
             print('Analysing TFR.')
             an.tfr()
         # EXPIPE
-        action.require_module('software_analysis_parameters',
+        action.create_module('software_analysis_parameters',
                               contents=ANALYSIS_PARAMS,
                               overwrite=(kwargs['overwrite'] or kwargs['skip']))
         for key, val in an.analysis_output.items():
             try:
-                mod = action.get_module(key).to_dict()
+                mod = action.modules[key].to_dict()
             except KeyError:
                 mod = {}
             config.deep_update(mod, val)
-            action.require_module(key, contents=mod,
-                                  overwrite=True)
+            action.create_module(key, contents=mod, overwrite=True)
 
     # @cli.command('group-analyse',
     #              short_help=('Search and generate an analysis-action that' +
