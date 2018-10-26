@@ -99,11 +99,9 @@ def attach_to_cli(cli):
         if user is None:
             raise ValueError('Please add user name')
         action.tags.extend(list(tag) + ['opto-' + brain_area] + list(paradigm))
-        fr = action.require_filerecord()
-        if not no_local:
-            exdir_path = action_tools._get_local_path(fr)
-        else:
-            exdir_path = fr.server_path
+
+        exdir_path = action_tools._get_data_path(action)
+
         exdir_object = exdir.File(exdir_path)
         aq_sys = exdir_object['acquisition'].attrs['acquisition_system'].lower()
         if aq_sys == 'axona':
@@ -129,7 +127,7 @@ def attach_to_cli(cli):
         if not no_modules:
             params.update({'location': brain_area})
             action_tools.generate_templates(
-                action, 'opto_' + aq_sys, overwrite)
+                action, 'opto_' + aq_sys, overwrite=overwrite)
             opto_tools.populate_modules(
                 action, params, no_intensity=no_intensity)
             action.modules[laser_name]['device_id'] = {'value': laser_id}
