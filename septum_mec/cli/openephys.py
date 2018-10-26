@@ -124,7 +124,7 @@ def attach_to_cli(cli):
             import klustakwik2
         action = None
         if exdir_path is None:
-            project = expipe_server.get_project(PAR.PROJECT_ID)
+            project = get_project()
             action = project.actions[action_id]
             fr = action.require_filerecord()
             if not no_local:
@@ -289,7 +289,7 @@ def attach_to_cli(cli):
     def generate_klusta_oe(action_id, prb_path, no_local, openephys_path,
                            exdir_path, nchan):
         if openephys_path is None:
-            project = expipe_server.get_project(PAR.PROJECT_ID)
+            project = get_project()
             action = project.require_action(action_id)
             fr = action.require_filerecord()
             if not no_local:
@@ -317,7 +317,7 @@ def attach_to_cli(cli):
         # TODO default none
         openephys_path = os.path.abspath(openephys_path)
         openephys_dirname = openephys_path.split(os.sep)[-1]
-        project = expipe_server.get_project(PAR.PROJECT_ID)
+        project = get_project()
 
         openephys_file = pyopenephys.File(openephys_path)
         openephys_exp = openephys_file.experiments[0]

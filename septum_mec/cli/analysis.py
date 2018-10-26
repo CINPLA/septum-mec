@@ -24,7 +24,7 @@ def attach_to_cli(cli):
                   )
     def generate_notebook(action_id, channel_group, no_local, run):
         from septum_mec.analysis.utils import create_notebook
-        project = expipe_server.get_project(PAR.PROJECT_ID)
+        project = get_project()
         action = project.require_action(action_id)
         fr = action.require_filerecord()
         if not no_local:
@@ -83,7 +83,7 @@ def attach_to_cli(cli):
                   )
     def analysis(**kwargs):
         if len(kwargs['channel_group']) == 0: kwargs['channel_group'] = None
-        project = expipe_server.get_project(PAR.PROJECT_ID)
+        project = get_project()
         action_id = kwargs['action_id'] + '-analysis'
         action = project.require_action(action_id)
         if kwargs['overwrite'] and kwargs['hard']:
@@ -186,7 +186,7 @@ def attach_to_cli(cli):
     #               )
     # def group_analysis(action_id, user, tags, overwrite, entities,
     #                    locations, actions):
-    #     project = expipe_server.get_project(PAR.PROJECT_ID)
+    #     project = get_project()
     #     analysis_action = project.require_action(action_id)
     #
     #     analysis_action.type = 'Group-analysis'
@@ -240,7 +240,7 @@ def attach_to_cli(cli):
     #     ch.setLevel(logging.DEBUG)
     #     logger.addHandler(ch)
     #
-    #     project = expipe_server.get_project(PAR.PROJECT_ID)
+    #     project = get_project()
     #     action = project.require_action(action_id)
     #     fr = action.require_filerecord()
     #     if not no_local:

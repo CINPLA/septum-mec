@@ -144,14 +144,25 @@ def expipe():
     return expipe
 
 @lazy_import
-def expipe_server():
+def require_project():
     from expipecli.main import load_config
     config = load_config()
     if config['local_root'] is None:
         print('Unable to locate expipe configurations.')
         return None
     assert config['local']['type'] == 'project'
-    server = expipe.load_file_system(root=config['local_root'].parent)
+    server = expipe.require_project(path=config['local_root'], name=config['local_root'].stem)
+    return server
+
+@lazy_import
+def get_project():
+    from expipecli.main import load_config
+    config = load_config()
+    if config['local_root'] is None:
+        print('Unable to locate expipe configurations.')
+        return None
+    assert config['local']['type'] == 'project'
+    server = expipe.get_project(path=config['local_root'], name=config['local_root'].stem)
     return server
 
 @lazy_import
