@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 long_description = open("README.md").read()
 
 setup(
-    name="septum-mec",
+    name="septum_mec",
     packages=find_packages(),
     version='0.1',
     include_package_data=True,
@@ -15,9 +15,4 @@ setup(
     platforms=['Linux', "Windows"],
     description="Plugins for the septum-mec project",
     long_description=long_description,
-    entry_points={
-        'console_scripts': [
-            'plugin-expipe-septum-mec = septum_mec.cli.main:reveal'
-        ],
-    },
 )

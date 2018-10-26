@@ -1,4 +1,4 @@
-from expipe_plugin_cinpla.tools.ssh import get_login, login, ssh_execute, untar
+# from expipe_plugin_cinpla.tools.ssh import get_login, login, ssh_execute, untar
 from expipe_plugin_cinpla.imports import *
 from expipe_plugin_cinpla.tools import action as action_tools
 
@@ -40,7 +40,7 @@ def attach_to_cli(cli):
                  hostname, server, yes):
         assert server in expipe.config.settings
         server_dict = expipe.config.settings.get(server)
-        project = expipe.require_project(PAR.PROJECT_ID)
+        project = expipe_server.require_project(PAR.PROJECT_ID)
         action = project.actions[action_id]
         fr = action.require_filerecord()
 

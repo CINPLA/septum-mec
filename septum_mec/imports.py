@@ -144,14 +144,26 @@ def expipe():
     return expipe
 
 @lazy_import
-def warnings():
-    import warnings
-    return warnings
+def expipe_server():
+    from expipecli.main import load_config
+    config = load_config()
+    if config['local_root'] is None:
+        print('Unable to locate expipe configurations.')
+        return None
+    assert config['local']['type'] == 'project'
+    server = expipe.load_file_system(root=config['local_root'].parent)
+    return server
 
 @lazy_import
 def PAR():
-    from expipe_plugin_cinpla.tools.config import load_parameters
-    return load_parameters()
+    from expipe_plugin_cinpla.tools.config import load_parameters, give_attrs_val
+    PAR = load_parameters()
+    give_attrs_val(
+        PAR, list(),
+        'POSSIBLE_OPTO_PARADIGMS',
+        'POSSIBLE_OPTO_TAGS',
+        'POSSIBLE_BRAIN_AREAS')
+    return PAR
 
 @lazy_import
 def yaml():

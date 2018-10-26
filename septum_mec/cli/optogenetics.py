@@ -93,7 +93,7 @@ def attach_to_cli(cli):
                            pulse_period, no_intensity, paradigm, pulsepalfile,
                            laser_name):
         # TODO deafault none
-        project = expipe.get_project(PAR.PROJECT_ID)
+        project = expipe_server.get_project(PAR.PROJECT_ID)
         action = project.actions[action_id]
         user = user or PAR.USERNAME
         if user is None:
@@ -149,7 +149,7 @@ def attach_to_cli(cli):
                   help='TTL input channel.',
                   )
     def parse_optogenetics_files(action_id, no_local, io_channel):
-        project = expipe.get_project(PAR.PROJECT_ID)
+        project = expipe_server.get_project(PAR.PROJECT_ID)
         action = project.require_action(action_id)
         fr = action.require_filerecord()
         if not no_local:

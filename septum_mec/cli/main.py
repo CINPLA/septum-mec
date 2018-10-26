@@ -5,12 +5,6 @@ from . import optogenetics
 from . import remote
 from septum_mec.imports import *
 
-def reveal():
-    """
-    This imports all plugins when loading expipe-cli.
-    """
-    pass
-
 
 class SeptumPlugin(IPlugin):
     def attach_to_cli(self, cli):

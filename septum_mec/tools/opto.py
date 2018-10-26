@@ -93,7 +93,7 @@ def populate_modules(action, params, no_intensity=False):
         std = params['laser_intensity'][laser_mask].std().rescale('mW')
         action.modules[name]['intensity'] = pq.UncertainQuantity(avg, uncertainty=std)
         timestring = datetime.strftime(
-            params['laser_dtime'], expipe.io.core.datetime_format)
+            params['laser_dtime'], expipe.core.datetime_format)
         action.modules[name]['intensity_date_time'] = timestring
         action.modules[name]['intensity_info'] = params['laser_info']
 
