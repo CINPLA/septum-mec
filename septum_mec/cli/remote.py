@@ -40,7 +40,7 @@ def attach_to_cli(cli):
                  hostname, server, yes):
         assert server in expipe.config.settings
         server_dict = expipe.config.settings.get(server)
-        project = require_project()
+        project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.actions[action_id]
         fr = action.require_filerecord()
 

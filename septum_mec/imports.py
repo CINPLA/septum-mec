@@ -144,28 +144,6 @@ def expipe():
     return expipe
 
 @lazy_import
-def require_project():
-    from expipecli.main import load_config
-    config = load_config()
-    if config['local_root'] is None:
-        print('Unable to locate expipe configurations.')
-        return None
-    assert config['local']['type'] == 'project'
-    server = expipe.require_project(path=config['local_root'], name=config['local_root'].stem)
-    return server
-
-@lazy_import
-def get_project():
-    from expipecli.main import load_config
-    config = load_config()
-    if config['local_root'] is None:
-        print('Unable to locate expipe configurations.')
-        return None
-    assert config['local']['type'] == 'project'
-    server = expipe.get_project(path=config['local_root'], name=config['local_root'].stem)
-    return server
-
-@lazy_import
 def PAR():
     from expipe_plugin_cinpla.tools.config import load_parameters, give_attrs_val
     PAR = load_parameters()
