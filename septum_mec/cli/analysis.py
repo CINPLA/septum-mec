@@ -24,7 +24,7 @@ def attach_to_cli(cli):
                   )
     def generate_notebook(action_id, channel_group, no_local, run):
         from septum_mec.analysis.utils import create_notebook
-        project = expipe.get_project(PAR.PROJECT_ID)
+        project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.require_action(action_id)
         fr = action.require_filerecord()
         if not no_local:
@@ -83,7 +83,7 @@ def attach_to_cli(cli):
                   )
     def analysis(**kwargs):
         if len(kwargs['channel_group']) == 0: kwargs['channel_group'] = None
-        project = expipe.get_project(PAR.PROJECT_ID)
+        project = expipe.get_project(PAR.PROJECT_ROOT)
         action_id = kwargs['action_id'] + '-analysis'
         action = project.require_action(action_id)
         if kwargs['overwrite'] and kwargs['hard']:
@@ -114,9 +114,6 @@ def attach_to_cli(cli):
             exdir_path = action_tools._get_local_path(fr)
         else:
             exdir_path = fr.server_path
-        # action.require_module('software_version_control_git',
-        #                       contents=action_tools.get_git_info(),
-        #                       overwrite=(kwargs['overwrite'] or kwargs['skip']))
         an = Analyser(exdir_path, params=ANALYSIS_PARAMS,
                       unit_info=PAR.UNIT_INFO,
                       channel_group=kwargs['channel_group'],
@@ -189,7 +186,7 @@ def attach_to_cli(cli):
     #               )
     # def group_analysis(action_id, user, tags, overwrite, entities,
     #                    locations, actions):
-    #     project = expipe.get_project(PAR.PROJECT_ID)
+    #     project = expipe.get_project(PAR.PROJECT_ROOT)
     #     analysis_action = project.require_action(action_id)
     #
     #     analysis_action.type = 'Group-analysis'
@@ -243,7 +240,7 @@ def attach_to_cli(cli):
     #     ch.setLevel(logging.DEBUG)
     #     logger.addHandler(ch)
     #
-    #     project = expipe.get_project(PAR.PROJECT_ID)
+    #     project = expipe.get_project(PAR.PROJECT_ROOT)
     #     action = project.require_action(action_id)
     #     fr = action.require_filerecord()
     #     if not no_local:

@@ -144,14 +144,15 @@ def expipe():
     return expipe
 
 @lazy_import
-def warnings():
-    import warnings
-    return warnings
-
-@lazy_import
 def PAR():
-    from expipe_plugin_cinpla.tools.config import load_parameters
-    return load_parameters()
+    from expipe_plugin_cinpla.tools.config import load_parameters, give_attrs_val
+    PAR = load_parameters()
+    give_attrs_val(
+        PAR, list(),
+        'POSSIBLE_OPTO_PARADIGMS',
+        'POSSIBLE_OPTO_TAGS',
+        'POSSIBLE_BRAIN_AREAS')
+    return PAR
 
 @lazy_import
 def yaml():
