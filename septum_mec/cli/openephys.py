@@ -164,7 +164,7 @@ def attach_to_cli(cli):
             if split_probe is not None:
                 split_chans = np.arange(nchan)
                 if split_probe != nchan / 2:
-                    warnings.warn('The split probe is not dividing the number' +
+                    print('WARNING: The split probe is not dividing the number' +
                                   ' of channels in two')
                 print('Splitting probe in channels \n"' +
                       str(split_chans[:split_probe]) + '"\nand\n"' +
@@ -258,7 +258,7 @@ def attach_to_cli(cli):
             #     if len(ttl_times) != 0:
             #         openephys_file.sync_tracking_from_events(ttl_times)
             #     else:
-            #         warnings.warn('No TTL events found on IO channel {}'.format(
+            #         print('WARNING: No TTL events found on IO channel {}'.format(
             #             shutter_channel))
 
 

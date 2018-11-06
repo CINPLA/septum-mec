@@ -99,8 +99,7 @@ def fix_nonmonotonous_timestamps(x, y, t):
         t_unit = t.units
         x_unit = x.units
         y_unit = y.units
-        import warnings
-        warnings.warn('Time is not monotonously increasing, ' +
+        print('WARNING: Time is not monotonously increasing, ' +
                       'removing equal and smaller timestamps.')
         t, (x, y) = remove_equal_times(t, x, y)
         if min(t) != t[0]:

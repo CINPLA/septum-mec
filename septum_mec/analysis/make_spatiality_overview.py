@@ -74,7 +74,7 @@ def make_spatiality_overview(x, y, t, angles, t_angles, sptr, acorr=None,
     ax3.grid(False)
     ax4 = fig.add_subplot(nrow, ncol, 4, aspect=1, projection=projection)
     if  (angles, t_angles) == (None, None):
-        print('# WARNING: unable to plot head direction')
+        print('WARNING: unable to plot head direction')
     else:
         ang_bins, rate_in_ang = tr.head_direction_rate(sptr, angles, t_angles,
                                                          binsize=ang_binsize)

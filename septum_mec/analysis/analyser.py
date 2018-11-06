@@ -445,7 +445,7 @@ class Analyser:
                                       np.median(np.diff(self.epoch.times)))
             if len(epo_over) > 10:
                 epo_over = None
-                warnings.warn('More than 10 trains was found, skipping epoch')
+                print('WARNING: More than 10 trains was found, skipping epoch')
 
             if epo_over is not None:
                 starts = starts + [t for t in epo_over.times]
@@ -486,7 +486,7 @@ class Analyser:
                     sampling_rates = [ana.sampling_rate
                                       for ana in self.seg.analogsignals]
                     if len(np.unique(sampling_rates)) > 1:
-                        warnings.warn('Found multiple sampling rates, selecting minimum')
+                        print('WARNING: Found multiple sampling rates, selecting minimum')
                     target_rate = min(sampling_rates)
 
                     sliced_anas = []
@@ -547,7 +547,7 @@ class Analyser:
                     sig, freqs = el.sta.spike_field_coherence(ana_arr, sptr,
                                                               **{'nperseg': 2048})
                     if not np.isfinite(sig).all():
-                        warnings.warn('Coherence is all NAN')
+                        print('WARNING: Coherence is all NAN')
                     if show_max:
                         freqs = freqs.magnitude
                         idx = np.argmax(np.max(sig[(freqs > srch[0]) &
