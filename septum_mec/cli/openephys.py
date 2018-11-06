@@ -118,19 +118,14 @@ def attach_to_cli(cli):
                           split_probe, no_local, openephys_path,
                           exdir_path, no_klusta, shutter_channel,
                           no_preprocess, no_spikes, no_lfp, no_tracking, ncpus_pr_group):
-        settings = config.load_settings()['current']
         if not no_klusta:
             import klusta
             import klustakwik2
         action = None
+        project = expipe.get_project(PAR.PROJECT_ROOT)
+        action = project.actions[action_id]
         if exdir_path is None:
-            project = expipe.get_project(PAR.PROJECT_ROOT)
-            action = project.actions[action_id]
-            fr = action.require_filerecord()
-            if not no_local:
-                exdir_path = action_tools._get_local_path(fr)
-            else:
-                exdir_path = fr.server_path
+            exdir_path = action_tools._get_data_path(action)
             exdir_file = exdir.File(exdir_path)
         if openephys_path is None:
             acquisition = exdir_file["acquisition"]
@@ -140,7 +135,7 @@ def attach_to_cli(cli):
             openephys_session = acquisition.attrs["openephys_session"]
             openephys_path = os.path.join(str(acquisition.directory), openephys_session)
             openephys_base = os.path.join(openephys_path, openephys_session)
-            prb_path = prb_path or settings.get('probe')
+            prb_path = prb_path or project.config.get('probe')
             openephys_file = pyopenephys.File(openephys_path, prb_path)
             openephys_exp = openephys_file.experiments[0]
             openephys_rec = openephys_exp.recordings[0]
