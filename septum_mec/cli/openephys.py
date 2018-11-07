@@ -286,11 +286,7 @@ def attach_to_cli(cli):
         if openephys_path is None:
             project = expipe.get_project(PAR.PROJECT_ROOT)
             action = project.require_action(action_id)
-            fr = action.require_filerecord()
-            if not no_local:
-                exdir_path = action_tools._get_local_path(fr)
-            else:
-                exdir_path = fr.server_path
+            exdir_path = action_tools._get_data_path(action)
             exdir_file = exdir.File(exdir_path)
             acquisition = exdir_file["acquisition"]
             if acquisition.attrs['acquisition_system'] != 'OpenEphys':

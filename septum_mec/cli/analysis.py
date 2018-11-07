@@ -26,11 +26,7 @@ def attach_to_cli(cli):
         from septum_mec.analysis.utils import create_notebook
         project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.require_action(action_id)
-        fr = action.require_filerecord()
-        if not no_local:
-            exdir_path = action_tools._get_local_path(fr, assert_exists=True)
-        else:
-            exdir_path = fr.server_path
+        exdir_path = action_tools._get_data_path(action)
         fname = create_notebook(exdir_path)
         if run:
             subprocess.run(['jupyter', 'notebook', fname])
@@ -109,11 +105,7 @@ def attach_to_cli(cli):
         action.entities.extend(list(entities))
         for m in kwargs['message']:
             action.create_message(text=m, user=user, datetime=datetime.now())
-        fr = rec_action.require_filerecord()
-        if not kwargs['no_local']:
-            exdir_path = action_tools._get_local_path(fr)
-        else:
-            exdir_path = fr.server_path
+        exdir_path = action_tools._get_data_path(project.actions[kwargs['action_id']])
         an = Analyser(exdir_path, params=ANALYSIS_PARAMS,
                       unit_info=PAR.UNIT_INFO,
                       channel_group=kwargs['channel_group'],
@@ -214,7 +206,6 @@ def attach_to_cli(cli):
     #         if len(locations) > 0:
     #             if action.location not in locations:
     #                 continue
-    #         fr = action.require_filerecord()
     #         name = action.id.rstrip('-analysis')
     #         analysis_action.entities.extend(list(action.entities))
     #         contents = {}
@@ -242,11 +233,7 @@ def attach_to_cli(cli):
     #
     #     project = expipe.get_project(PAR.PROJECT_ROOT)
     #     action = project.require_action(action_id)
-    #     fr = action.require_filerecord()
-    #     if not no_local:
-    #         exdir_path = action_tools._get_local_path(fr, assert_exists=True)
-    #     else:
-    #         exdir_path = fr.server_path
+    #     exdir_path = action_tools._get_data_path(action)
     #     print('Spikesorting ', exdir_path)
     #     model = NeoModel(exdir_path)
     #     channel_groups = model.channel_groups
