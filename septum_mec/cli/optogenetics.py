@@ -149,11 +149,7 @@ def attach_to_cli(cli):
     def parse_optogenetics_files(action_id, no_local, io_channel):
         project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.require_action(action_id)
-        fr = action.require_filerecord()
-        if not no_local:
-            exdir_path = action_tools._get_local_path(fr)
-        else:
-            exdir_path = fr.server_path
+        exdir_path = action_tools._get_data_path(action)
         exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
         if exdir_object['acquisition'].attrs['acquisition_system'] == 'Axona':
             aq_sys = 'axona'

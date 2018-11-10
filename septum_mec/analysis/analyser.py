@@ -68,7 +68,6 @@ class Analyser:
         self.ext = ext
         self.save_figs = save_figs
         self.close_fig = close_fig
-        self.exdir_path = exdir_path.replace('\\', '/')
 
         self._exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
         processing = self._exdir_object['processing']

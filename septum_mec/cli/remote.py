@@ -42,17 +42,16 @@ def attach_to_cli(cli):
         server_dict = expipe.config.settings.get(server)
         project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.actions[action_id]
-        fr = action.require_filerecord()
+        exdir_path = action_tools._get_data_path(action)
 
         host, user, pas, port = get_login(
             hostname=hostname, username=username, port=port, server=server_dict)
         ssh, scp_client, sftp_client, pbar = login(
             hostname=host, username=user, password=pas, port=port)
         serverpath = expipe.config.settings[server]['data_path']
-        server_data = os.path.dirname(os.path.join(serverpath, fr.exdir_path))
-        server_data = server_data.replace('\\', '/')
+        server_data = os.path.dirname(os.path.join(serverpath, exdir_path))
         ########################## SEND  #######################################
-        local_data = os.path.dirname(action_tools._get_local_path(fr, assert_exists=True))
+        local_data = os.path.dirname(exdir_path)
         print('Initializing transfer of "' + local_data + '" to "' +
               server_data + '"')
         try: # make directory for untaring
@@ -81,7 +80,6 @@ def attach_to_cli(cli):
         print('Processing on server')
         ssh_execute(ssh, "expipe openephys process {}".format(action_id), get_pty=True, timeout=None)
         ####################### RETURN PROCESSED DATA #######################
-        local_data = os.path.dirname(action_tools._get_local_path(fr, make=True))
         print('Initializing transfer of "' + server_data + '" to "' +
                       local_data + '"')
         print('Packing tar archive')
