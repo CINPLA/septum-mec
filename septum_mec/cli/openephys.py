@@ -90,10 +90,6 @@ def attach_to_cli(cli):
                   is_flag=True,
                   help='Disable registering of tracking data to exdir.',
                   )
-    @click.option('--no-local',
-                  is_flag=True,
-                  help='Store temporary on local drive.',
-                  )
     @click.option('--no-preprocess',
                   is_flag=True,
                   help='Preprocess data.',
@@ -115,7 +111,7 @@ def attach_to_cli(cli):
                           threshold_strong_std_factor,
                           threshold_weak_std_factor,
                           common_ref, ground,
-                          split_probe, no_local, openephys_path,
+                          split_probe, openephys_path,
                           exdir_path, no_klusta, shutter_channel,
                           no_preprocess, no_spikes, no_lfp, no_tracking, ncpus_pr_group):
         if not no_klusta:
@@ -126,7 +122,7 @@ def attach_to_cli(cli):
         action = project.actions[action_id]
         if exdir_path is None:
             exdir_path = action_tools._get_data_path(action)
-            exdir_file = exdir.File(exdir_path)
+            exdir_file = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
         if openephys_path is None:
             acquisition = exdir_file["acquisition"]
             if acquisition.attrs['acquisition_system'] is None:
@@ -281,17 +277,13 @@ def attach_to_cli(cli):
                   default=32,
                   help='Number of channels. Default = 32',
                   )
-    def generate_klusta_oe(action_id, prb_path, no_local, openephys_path,
+    def generate_klusta_oe(action_id, prb_path, openephys_path,
                            exdir_path, nchan):
         if openephys_path is None:
             project = expipe.get_project(PAR.PROJECT_ROOT)
             action = project.require_action(action_id)
-            fr = action.require_filerecord()
-            if not no_local:
-                exdir_path = action_tools._get_local_path(fr)
-            else:
-                exdir_path = fr.server_path
-            exdir_file = exdir.File(exdir_path)
+            exdir_path = action_tools._get_data_path(action)
+            exdir_file = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
             acquisition = exdir_file["acquisition"]
             if acquisition.attrs['acquisition_system'] != 'OpenEphys':
                 raise ValueError('No Open Ephys aquisition system ' +

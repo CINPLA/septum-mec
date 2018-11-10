@@ -3,7 +3,7 @@ import exdir
 import json
 
 def create_notebook(exdir_path, channel_group=0):
-    exob = exdir.File(exdir_path)
+    exob = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
     analysis_path = str(exob.require_group('analysis').directory)
     currdir = os.path.dirname(os.path.abspath(__file__))
     fname = os.path.join(currdir, 'template_notebook.ipynb')
