@@ -166,7 +166,7 @@ def generate_epochs(exdir_path, times, durations, **annotations):
     dset.attrs['num_samples'] = len(times)
     dset = epo_group.require_dataset('durations', data=durations)
     dset.attrs['num_samples'] = len(durations)
-    attrs = epo_group.attrs.to_dict()
+    attrs = epo_group.attrs.contents
     if annotations:
         attrs.update(annotations)
     epo_group.attrs = attrs

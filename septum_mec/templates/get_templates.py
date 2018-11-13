@@ -8,7 +8,7 @@ server = expipe.load_file_system(root='/home/mikkel/expipe/')
 base_dir = op.join(op.abspath(op.dirname(op.expanduser(__file__))), 'templates')
 project = server.require_project('septum-mec')
 for template, val in project.templates.items():
-    result = val.to_dict()
+    result = val.contents
     identifier = result.get('identifier')
     if identifier is None:
         continue

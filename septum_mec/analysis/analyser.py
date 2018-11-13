@@ -68,15 +68,16 @@ class Analyser:
         self.ext = ext
         self.save_figs = save_figs
         self.close_fig = close_fig
+        self.exdir_path = str(exdir_path)
 
-        self._exdir_object = exdir.File(exdir_path)
+        self._exdir_object = exdir.File(self.exdir_path)
         processing = self._exdir_object['processing']
         if 'tracking' in processing:
             tracking_data = track_tools.get_processed_tracking(
                 exdir_path, par=params, return_rad=False)
             self.x, self.y, self.t, self.ang, self.ang_t = tracking_data
         # NEO
-        io = neo.ExdirIO(exdir_path)
+        io = neo.ExdirIO(self.exdir_path)
         self.blk = io.read_block()
         self.seg = self.blk.segments[0]
         self.chxs = self.blk.channel_indexes

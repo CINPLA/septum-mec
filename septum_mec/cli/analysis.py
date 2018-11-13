@@ -138,7 +138,7 @@ def attach_to_cli(cli):
             action.modules['software_analysis_parameters'] = ANALYSIS_PARAMS
         for key, val in an.analysis_output.items():
             try:
-                mod = action.modules[key].to_dict()
+                mod = action.modules[key].contents
             except KeyError:
                 mod = {}
             config.deep_update(mod, val)

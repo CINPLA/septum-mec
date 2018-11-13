@@ -138,7 +138,7 @@ def get_tracking(postion_group):
         return tracking
 
 
-def select_best_position(x1, y1, t1, x2, y2, t2, speed_filter=5 * pq.m / pq.s):
+def select_best_position(x1, y1, t1, x2, y2, t2, speed_filter=5):
     """
     selects position data with least nan after speed filtering
 
@@ -159,10 +159,7 @@ def select_best_position(x1, y1, t1, x2, y2, t2, speed_filter=5 * pq.m / pq.s):
     speed_filter : None or quantities in m/s
         threshold filter for translational speed
     """
-    from exana.misc import is_quantities
-    is_quantities([x1, y1, t1, x2, y2, t2], 'vector')
     x1, y1, t1, x2, y2, t2 = _cut_to_same_len(x1, y1, t1, x2, y2, t2)
-    is_quantities(speed_filter, 'scalar')
     measurements1 = len(x1)
     measurements2 = len(x2)
     x1, y1, t1 = rm_nans(x1, y1, t1)
@@ -186,8 +183,8 @@ def select_best_position(x1, y1, t1, x2, y2, t2, speed_filter=5 * pq.m / pq.s):
     return x, y, t
 
 
-def interp_filt_position(x, y, tm, box_xlen=1 * pq.m, box_ylen=1 * pq.m,
-                         pos_fs=100 * pq.Hz, f_cut=10 * pq.Hz):
+def interp_filt_position(x, y, tm, box_xlen=1, box_ylen=1,
+                         pos_fs=100, f_cut=10):
     """
     rapid head movements will contribute to velocity artifacts,
     these can be removed by low-pass filtering
@@ -210,12 +207,16 @@ def interp_filt_position(x, y, tm, box_xlen=1 * pq.m, box_ylen=1 * pq.m,
     out : angles, resized t
     """
     import scipy.signal as ss
-    from exana.misc import is_quantities
     assert len(x) == len(y) == len(tm), 'x, y, t must have same length'
-    is_quantities([x, y, tm], 'vector')
-    is_quantities([pos_fs, box_xlen, box_ylen, f_cut], 'scalar')
-    spat_dim = x.units
-    t = np.arange(tm.min(), tm.max() + 1. / pos_fs, 1. / pos_fs) * tm.units
+    if isinstance(x, pq.Quantity):
+        spat_dim = x.units
+    else:
+        spat_dim = 1
+    if isinstance(tm, pq.Quantity):
+        time_dim = tm.units
+    else:
+        time_dim = 1
+    t = np.arange(tm.min(), tm.max() + 1. / pos_fs, 1. / pos_fs) * time_dim
     x = np.interp(t, tm, x)
     y = np.interp(t, tm, y)
     # rapid head movements will contribute to velocity artifacts,
@@ -285,10 +286,7 @@ def velocity_threshold(x, y, t, threshold):
         1d vector of times at x, y positions
     threshold : float
     """
-    from exana.misc import is_quantities
     assert len(x) == len(y) == len(t), 'x, y, t must have same length'
-    is_quantities([x, y, t], 'vector')
-    is_quantities(threshold, 'scalar')
     r = np.sqrt(np.diff(x)**2 + np.diff(y)**2)
     v = np.divide(r, np.diff(t))
     speed_lim = np.concatenate(([False], v > threshold), axis=0)
