@@ -102,7 +102,7 @@ def attach_to_cli(cli):
 
         exdir_path = action_tools._get_data_path(action)
 
-        exdir_object = exdir.File(exdir_path)
+        exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
         aq_sys = exdir_object['acquisition'].attrs['acquisition_system'].lower()
         if aq_sys == 'axona':
             if use_axona_cut:
@@ -150,7 +150,7 @@ def attach_to_cli(cli):
         project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.require_action(action_id)
         exdir_path = action_tools._get_data_path(action)
-        exdir_object = exdir.File(exdir_path)
+        exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
         if exdir_object['acquisition'].attrs['acquisition_system'] == 'Axona':
             aq_sys = 'axona'
             params = opto_tools.generate_axona_opto(exdir_path, io_channel)

@@ -3,7 +3,7 @@ from expipe_plugin_cinpla.imports import *
 
 def generate_axona_opto(exdir_path, io_channel=8, no_intensity=False,
                         **annotations):
-    exdir_object = exdir.File(exdir_path)
+    exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
     session = exdir_object['acquisition'].attrs['axona_session']
     param = extract_laser_params(
         os.path.join(str(exdir_object['acquisition'].directory), session),
@@ -25,7 +25,7 @@ def generate_axona_opto(exdir_path, io_channel=8, no_intensity=False,
 
 
 def generate_axona_opto_from_cut(exdir_path, pulse_phasedur, io_channel=8):
-    exdir_object = exdir.File(exdir_path)
+    exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
     session = exdir_object['acquisition'].attrs['axona_session']
     # get the data
     elphys = exdir_object['processing']['electrophysiology']
@@ -42,7 +42,7 @@ def generate_axona_opto_from_cut(exdir_path, pulse_phasedur, io_channel=8):
 
 
 def generate_openephys_opto(exdir_path, io_channel, pulsepalfile):
-    exdir_object = exdir.File(exdir_path)
+    exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
     session = exdir_object['acquisition'].attrs['openephys_session']
     openephys_path = os.path.join(str(exdir_object['acquisition'].directory), session)
 
@@ -158,7 +158,7 @@ def extract_laser_params(acquisition_directory, pulsepalfile=None, no_intensity=
 
 
 def generate_epochs(exdir_path, times, durations, **annotations):
-    exdir_object = exdir.File(exdir_path)
+    exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
     group = exdir_object.require_group('epochs')
     epo_group = group.require_group('Optogenetics')
     epo_group.attrs['num_samples'] = len(times)

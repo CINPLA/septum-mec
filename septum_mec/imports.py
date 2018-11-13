@@ -95,6 +95,7 @@ def neo():
 @lazy_import
 def exdir():
     import exdir
+    import exdir.plugins.quantities
     return exdir
 
 @lazy_import

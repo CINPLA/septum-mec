@@ -53,7 +53,7 @@ def get_processed_tracking(exdir_path, par, return_rad=False):
     """
     from exana.tracking import head_direction
     import exdir
-    exdir_group = exdir.File(exdir_path)
+    exdir_group = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
     processing = exdir_group['processing']
     assert 'tracking' in processing, 'No tracking recorded.'
     position_group = processing['tracking']['camera_0']['Position']

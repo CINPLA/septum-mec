@@ -70,7 +70,7 @@ class Analyser:
         self.close_fig = close_fig
         self.exdir_path = str(exdir_path)
 
-        self._exdir_object = exdir.File(self.exdir_path)
+        self._exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)
         processing = self._exdir_object['processing']
         if 'tracking' in processing:
             tracking_data = track_tools.get_processed_tracking(
