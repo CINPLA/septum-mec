@@ -23,7 +23,7 @@ def attach_to_cli(cli):
                   help='Path to desired exdir directory, if none it is deduced from action id.',
                   )
     @click.option('--sorter',
-                  required=True,
+                  default='klusta',
                   type=click.Choice(['klusta', 'mountain', 'kilosort']),
                   help='',
                   )
