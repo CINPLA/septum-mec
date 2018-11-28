@@ -3,6 +3,8 @@ from expipe_plugin_cinpla.tools import action as action_tools
 from septum_mec.analysis import signals as sig_tools
 from datetime import timedelta
 from expipe_plugin_cinpla.tools import config
+import spikeextractors as se
+import spiketoolkit as st
 import os.path as op
 
 
@@ -44,17 +46,20 @@ def attach_to_cli(cli):
             openephys_path = os.path.join(str(acquisition.directory), openephys_session)
             probe_path = probe_path or project.config.get('probe')
 
-        #TODO preprocessing: cmr, grounding
-        recording = si.OpenEphysRecordingExtractor(openephys_path)
-        si.loadProbeFile(recording, probe_path)
+        recording = se.OpenEphysRecordingExtractor(openephys_path)
+        se.loadProbeFile(recording, probe_path)
+        # apply cmr
+        recording_cmr = st.filters.common_reference(recording, groups=[[recording.getChanelIds()[:16]],
+                                                                       [recording.getChanbelIds()[16:]]])
+
         if sorter == 'klusta':
-            sorting = st.sorSTRINGters.klusta(recording)
-            #TODO multiprocessing
+            sorting = st.spikeSortByGroup(recording, spikesorter='klusta')
         elif sorter == 'mountain':
-            sorting = st.sorters.mountainsort4(recording, adjacency_radius=10, detect_sign=-1)
+            sorting = st.spikeSortByGroup(recording, spikesorter='mountainsort', adjacency_radius=10, detect_sign=-1)
         elif sorter == 'kilosort':
-            sorting = st.sorters.kilosort(recording, kilosort_path='/home/mikkel/apps/KiloSort', npy_matlab_path='/home/mikkel/apps/npy-matlab/npy-matlab')
-        st.exportToPhy(recording, sorting, openephys_path / 'phy')
-            # sorting_cuated = si.PhysortingExtractor(openephys_path / 'phy')
-        #TODO store data in exdir sorting extractor
-        # si.ExdirSortingExtractor.writeSorting(sorting, exdir_path)
+            sorting = st.sorters.kilosort(recording,
+                                          kilosort_path='/home/mikkel/apps/KiloSort',
+                                          npy_matlab_path='/home/mikkel/apps/npy-matlab/npy-matlab')
+        # st.exportToPhy(recording, sorting, openephys_path / 'phy')
+        #     # sorting_cuated = si.PhysortingExtractor(openephys_path / 'phy')
+        se.ExdirSortingExtractor.writeSorting(sorting, exdir_path, sample_rate=recording.getSamplingFrequency())
