@@ -49,17 +49,19 @@ def attach_to_cli(cli):
         recording = se.OpenEphysRecordingExtractor(openephys_path)
         se.loadProbeFile(recording, probe_path)
         # apply cmr
-        recording_cmr = st.filters.common_reference(recording, groups=[[recording.getChanelIds()[:16]],
-                                                                       [recording.getChanbelIds()[16:]]])
+        recording_cmr = st.preprocessing.common_reference(recording)
+        recording_lfp = st.preprocessing.bandpass_filter(recording, freq_min=1, freq_max=300)
+        recording_lfp = st.preprocessing.resample(recording, 1000)
 
         if sorter == 'klusta':
-            sorting = st.spikeSortByGroup(recording, spikesorter='klusta')
+            sorting = st.sorters.klusta(recording, by_property='group')
         elif sorter == 'mountain':
-            sorting = st.spikeSortByGroup(recording, spikesorter='mountainsort', adjacency_radius=10, detect_sign=-1)
+            sorting = st.sorters.mountainsort4(recording, by_property='group',
+                                               adjacency_radius=10, detect_sign=-1)
         elif sorter == 'kilosort':
-            sorting = st.sorters.kilosort(recording,
+            sorting = st.sorters.kilosort(recording, by_property='group',
                                           kilosort_path='/home/mikkel/apps/KiloSort',
                                           npy_matlab_path='/home/mikkel/apps/npy-matlab/npy-matlab')
-        # st.exportToPhy(recording, sorting, openephys_path / 'phy')
-        #     # sorting_cuated = si.PhysortingExtractor(openephys_path / 'phy')
+        # extract waveforms
+
         se.ExdirSortingExtractor.writeSorting(sorting, exdir_path, sample_rate=recording.getSamplingFrequency())
