@@ -1,11 +1,12 @@
-from septum_mec.imports import *
-from expipe_plugin_cinpla.tools import action as action_tools
-from septum_mec.analysis import signals as sig_tools
+# from septum_mec.imports import *
+# from expipe_plugin_cinpla.tools import action as action_tools
+import exdir
+# from septum_mec.analysis import signals as sig_tools
 from datetime import timedelta
-from expipe_plugin_cinpla.tools import config
-import spikeextractors as se
-import spiketoolkit as st
+# from expipe_plugin_cinpla.tools import config
+
 import os.path as op
+import os
 
 
 def attach_to_cli(cli):
@@ -26,11 +27,11 @@ def attach_to_cli(cli):
                   )
     @click.option('--sorter',
                   default='klusta',
-                  type=click.Choice(['klusta', 'mountain', 'kilosort']),
+                  type=click.Choice(['klusta', 'mountain', 'kilosort', 'spyking-circus', 'ironclust']),
                   help='',
                   )
     def process_openephys(action_id, probe_path, exdir_path, openephys_path, sorter):
-        import spikeinterface as si
+        import spikeextractors as se
         import spiketoolkit as st
         project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.actions[action_id]
@@ -51,7 +52,8 @@ def attach_to_cli(cli):
         # apply cmr
         recording_cmr = st.preprocessing.common_reference(recording)
         recording_lfp = st.preprocessing.bandpass_filter(recording, freq_min=1, freq_max=300)
-        recording_lfp = st.preprocessing.resample(recording, 1000)
+        recording_lfp = st.preprocessing.resample(recording_lfp, 1000)
+        recording_hp = st.preprocessing.bandpass_filter(recording_cmr, freq_min=300, freq_max=6000)
 
         if sorter == 'klusta':
             sorting = st.sorters.klusta(recording, by_property='group')
@@ -62,6 +64,61 @@ def attach_to_cli(cli):
             sorting = st.sorters.kilosort(recording, by_property='group',
                                           kilosort_path='/home/mikkel/apps/KiloSort',
                                           npy_matlab_path='/home/mikkel/apps/npy-matlab/npy-matlab')
-        # extract waveforms
+        elif sorter == 'spyking-circus':
+            sorting = st.sorters.spyking_circus(recording, by_property='group')
+        elif sorter == 'ironclust':
+            sorting = st.sorters.ironclust(recording, by_property='group')
+        else:
+            raise NotImplementedError("sorter is not implemented")
 
+        # extract waveforms
+        wf = st.postprocessing.getUnitWaveforms(recording_hp, sorting)
+        # save spike times and waveforms to exdir
         se.ExdirSortingExtractor.writeSorting(sorting, exdir_path, sample_rate=recording.getSamplingFrequency())
+        # save LFP to exdir
+        se.ExdirRecordingExtractor.writeRecording(recording_lfp, exdir_path, lfp=True)
+
+
+if __name__ == "__main__":
+    import spikeextractors as se
+    import spiketoolkit as st
+
+    exdir_path = '/home/alessiob/Documents/Codes/spike_sorting/test'
+    probe_path = '/home/alessiob/Documents/Codes/spike_sorting/tetrode32_si.prb'
+    openephys_path = '/home/alessiob/Documents/Data/1806_2018-12-03_15-33-53_2'
+    sorter = 'ironclust'
+
+    recording = se.OpenEphysRecordingExtractor(openephys_path)
+    se.loadProbeFile(recording, probe_path)
+    # apply cmr
+    recording_cmr = st.preprocessing.common_reference(recording)
+    recording_lfp = st.preprocessing.bandpass_filter(recording, freq_min=1, freq_max=300)
+    recording_lfp = st.preprocessing.resample(recording, 1000)
+    recording_hp = st.preprocessing.bandpass_filter(recording_cmr, freq_min=300, freq_max=6000)
+
+    if sorter == 'klusta':
+        sorting = st.sorters.klusta(recording, by_property='group')
+    elif sorter == 'mountain':
+        sorting = st.sorters.mountainsort4(recording, by_property='group',
+                                           adjacency_radius=10, detect_sign=-1)
+    elif sorter == 'kilosort':
+        sorting = st.sorters.kilosort(recording, by_property='group',
+                                      kilosort_path='/home/mikkel/apps/KiloSort',
+                                      npy_matlab_path='/home/mikkel/apps/npy-matlab/npy-matlab')
+    elif sorter == 'spyking-circus':
+        sorting = st.sorters.spyking_circus(recording, by_property='group', merge_spikes=False)
+    elif sorter == 'ironclust':
+        sorting = st.sorters.ironclust(recording, by_property='group')
+    else:
+        raise NotImplementedError("sorter is not implemented")
+
+    # extract waveforms
+    print('Computing waveforms')
+    #TODO fix thiscd Doc    Cod
+    wf = st.postprocessing.getUnitWaveforms(recording_hp, sorting)
+    # save spike times and waveforms to exdir
+    se.ExdirSortingExtractor.writeSorting(sorting, exdir_path, sample_rate=recording.getSamplingFrequency())
+    # save LFP to exdir
+    se.ExdirRecordingExtractor.writeRecording(recording_lfp, exdir_path, lfp=True)
+
+    print(len(sorting.getUnitIds()), sorting.getUnitIds())
