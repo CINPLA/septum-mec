@@ -226,3 +226,52 @@ def plot_spike_histogram(trials, color='b', ax=None, binsize=None, bins=None,
     ax.bar(bs[:len(time_hist)], time_hist.magnitude.flatten(), width=bs[1]-bs[0],
            edgecolor=edgecolor, facecolor=color, alpha=alpha, align='edge')
     return ax
+
+
+def plot_waveforms(sptr, color='r', fig=None, title='waveforms', lw=2, gs=None):
+    """
+    Visualize waveforms on respective channels
+
+    Parameters
+    ----------
+    sptr : neo.SpikeTrain
+    color : color of waveforms
+    title : figure title
+    fig : matplotlib figure
+
+    Returns
+    -------
+    out : fig
+    """
+    import matplotlib.gridspec as gridspec
+    nrc = sptr.waveforms.shape[1]
+    if fig is None:
+        fig = plt.figure()
+    axs = []
+    ax = None
+    for c in range(nrc):
+        if gs is None:
+            ax = fig.add_subplot(1, nrc, c+1, sharex=ax, sharey=ax)
+        else:
+            gs0 = gridspec.GridSpecFromSubplotSpec(1, nrc, subplot_spec=gs)
+            ax = fig.add_subplot(gs0[:, c], sharex=ax, sharey=ax)
+        axs.append(ax)
+    for c in range(nrc):
+        wf = sptr.waveforms[:, c, :]
+        m = np.mean(wf, axis=0)
+        stime = np.arange(m.size, dtype=np.float32)/sptr.sampling_rate
+        stime.units = 'ms'
+        sd = np.std(wf, axis=0)
+        axs[c].plot(stime, m, color=color, lw=lw)
+        axs[c].fill_between(stime, m-sd, m+sd, alpha=.1, color=color)
+        if sptr.left_sweep is not None:
+            sptr.left_sweep.units = 'ms'
+            axs[c].axvspan(sptr.left_sweep, sptr.left_sweep, color='k',
+                           ls='--')
+        axs[c].set_xlabel(stime.dimensionality)
+        axs[c].set_xlim([stime.min(), stime.max()])
+        if c > 0:
+            plt.setp(axs[c].get_yticklabels(), visible=False)
+    axs[0].set_ylabel(r'amplitude $\pm$ std [%s]' % wf.dimensionality)
+    fig.suptitle(title)
+    return fig
