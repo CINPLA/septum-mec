@@ -1,7 +1,7 @@
 from septum_mec.imports import *
-from expipe_plugin_cinpla.tools import action as action_tools
+from expipe_plugin_cinpla.scripts import utils as action_tools
 from septum_mec.tools import opto as opto_tools
-from expipe_plugin_cinpla.tools import config
+from expipe_plugin_cinpla.cli import utils
 
 
 def attach_to_cli(cli):
@@ -9,20 +9,20 @@ def attach_to_cli(cli):
     @click.argument('action-id', type=click.STRING)
     @click.option('--brain-area',
                   required=True,
-                  callback=config.optional_choice,
-                  envvar=PAR.POSSIBLE_BRAIN_AREAS,
+                  callback=utils.optional_choice,
+                  envvar=project.config.get('possible_brain_areas') or [],
                   help='The anatomical brain-area of the optogenetic stimulus.',
                   )
     @click.option('--paradigm',
                   required=True,
-                  callback=config.optional_choice,
-                  envvar=PAR.POSSIBLE_OPTO_PARADIGMS,
+                  callback=utils.optional_choice,
+                  envvar=project.config.get('possible_opto_paradigms') or [],
                   help='The anatomical brain-area of the optogenetic stimulus.',
                   )
     @click.option('-t', '--tag',
                   multiple=True,
-                  callback=config.optional_choice,
-                  envvar=PAR.POSSIBLE_TAGS,
+                  callback=utils.optional_choice,
+                  envvar=project.config.get('possible_tags') or [],
                   help='The anatomical brain-area of the optogenetic stimulus.',
                   )
     @click.option('-m', '--message',
@@ -93,9 +93,8 @@ def attach_to_cli(cli):
                            pulse_period, no_intensity, paradigm, pulsepalfile,
                            laser_name):
         # TODO deafault none
-        project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.actions[action_id]
-        user = user or PAR.USERNAME
+        user = user or project.config.get('username') or []
         if user is None:
             raise ValueError('Please add user name')
         action.tags.extend(list(tag) + ['opto-' + brain_area] + list(paradigm))
@@ -147,7 +146,6 @@ def attach_to_cli(cli):
                   help='TTL input channel.',
                   )
     def parse_optogenetics_files(action_id, no_local, io_channel):
-        project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.require_action(action_id)
         exdir_path = action_tools._get_data_path(action)
         exdir_object = exdir.File(exdir_path, plugins=exdir.plugins.quantities)

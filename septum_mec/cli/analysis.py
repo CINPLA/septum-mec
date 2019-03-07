@@ -1,9 +1,17 @@
 from septum_mec.imports import *
-from expipe_plugin_cinpla.tools import action as action_tools
+from expipe_plugin_cinpla.scripts import utils as action_tools
 from septum_mec.analysis.analyser import Analyser
-from expipe_plugin_cinpla.tools import config
-from septum_mec.config.parameters import ANALYSIS_PARAMS
-
+from expipe_plugin_cinpla.imports import *
+from expipe_plugin_cinpla.cli import utils
+ANALYSIS_PARAMS = {}
+def deep_update(d, other):
+    for k, v in other.items():
+        d_v = d.get(k)
+        if (isinstance(v, collections.Mapping) and
+            isinstance(d_v, collections.Mapping)):
+            deep_update(d_v, v)
+        else:
+            d[k] = copy.deepcopy(v)
 
 def attach_to_cli(cli):
     @cli.command('generate-notebook',
@@ -24,7 +32,6 @@ def attach_to_cli(cli):
                   )
     def generate_notebook(action_id, channel_group, no_local, run):
         from septum_mec.analysis.utils import create_notebook
-        project = expipe.get_project(PAR.PROJECT_ROOT)
         action = project.require_action(action_id)
         exdir_path = action_tools._get_data_path(action)
         fname = create_notebook(exdir_path)
@@ -52,8 +59,8 @@ def attach_to_cli(cli):
     @click.option('-t', '--tag',
                   multiple=True,
                   type=click.STRING,
-                  callback=config.optional_choice,
-                  envvar=PAR.POSSIBLE_TAGS,
+                  callback=utils.optional_choice,
+                  envvar=project.config.get('possible_tags') or [],
                   help='Add tags to action.',
                   )
     @click.option('-m', '--message',
@@ -79,7 +86,6 @@ def attach_to_cli(cli):
                   )
     def analysis(**kwargs):
         if len(kwargs['channel_group']) == 0: kwargs['channel_group'] = None
-        project = expipe.get_project(PAR.PROJECT_ROOT)
         action_id = kwargs['action_id'] + '-analysis'
         action = project.require_action(action_id)
         if kwargs['overwrite'] and kwargs['hard']:
@@ -89,7 +95,7 @@ def attach_to_cli(cli):
                 print(str(e))
         rec_action = project.require_action(kwargs['action_id'])
         action.type = 'Action-analysis'
-        user = kwargs['user'] or PAR.USERNAME
+        user = kwargs['user'] or project.config.get('username') or []
         user = user or []
         if len(user) == 0:
             raise ValueError('Please add user name')
@@ -107,7 +113,7 @@ def attach_to_cli(cli):
             action.create_message(text=m, user=user, datetime=datetime.now())
         exdir_path = action_tools._get_data_path(project.actions[kwargs['action_id']])
         an = Analyser(exdir_path, params=ANALYSIS_PARAMS,
-                      unit_info=PAR.UNIT_INFO,
+                      unit_info=None,#TDODO PAR.UNIT_INFO,
                       channel_group=kwargs['channel_group'],
                       no_local=kwargs['no_local'],
                       overwrite=kwargs['overwrite'],
@@ -141,7 +147,7 @@ def attach_to_cli(cli):
                 mod = action.modules[key].contents
             except KeyError:
                 mod = {}
-            config.deep_update(mod, val)
+            deep_update(mod, val)
             action.modules[key] = mod
 
     # @cli.command('group-analyse',

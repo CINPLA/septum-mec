@@ -1,9 +1,6 @@
 from expipecli.utils.plugin import IPlugin
 from . import analysis
-from . import openephys as OE
 from . import optogenetics
-from . import remote
-from . import sortertool
 from septum_mec.imports import *
 
 

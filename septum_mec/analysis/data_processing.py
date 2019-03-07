@@ -1,10 +1,10 @@
 # This is work in progress,
 import neo
 import numpy as np
+import exdir
 import exdir.plugins.quantities
 import exdir.plugins.git_lfs
 import pathlib
-import exdir
 import os
 
 
@@ -259,24 +259,62 @@ def load_tracking(data_path, par):
     return x, y, t, speed
 
 
-def load_spike_train(data_path, unit_path, t):
+def load_spiketrains(data_path, channel_id=None, remove_label='noise', waveform=True):
+    if waveform:
+        io = neo.ExdirIO(str(data_path), plugins=[exdir.plugins.quantities, exdir.plugins.git_lfs.Plugin(verbose=True)])
+        if channel_id is None:
+            blk = io.read_block()
+            sptr = blk.segments[0].spiketrains
+        else:
+            blk = io.read_block(channel_group_idx=channel_id)
+            channels = blk.channel_indexes
+            chx = channels[0]
+            sptr = [u.spiketrains[0] for u in chx.units]
+    else:
+        sptr = []
+        unit_id = 0
+        while True:
+            try:
+                spike_times = load_spike_train(data_path, channel_id, unit_id)
+            except:
+                break
+            sptr.append(spike_times)
+            unit_id +=1
+    if remove_label is not None:
+        if 'cluster_group' in sptr[0].annotations.keys():
+            sptr = [s for s in sptr if remove_label not in s.annotations['cluster_group']]
+        else:
+            print("Data have to be curated with phy to remove noise. Returning all spike trains")
+    return sptr
+
+
+def load_epochs(data_path):
+    io = neo.ExdirIO(str(data_path), plugins=[exdir.plugins.quantities, exdir.plugins.git_lfs])
+    blk = io.read_block(channel_group_idx=0)
+    seg = blk.segments[0]
+    epochs = seg.epochs
+    return epochs
+
+
+def get_data_path(action):
+    action_path = action._backend.path
+    project_path = action_path.parent.parent
+    print(project_path)
+    # data_path = action.data['main']
+    data_path = str(pathlib.Path(pathlib.PureWindowsPath(action.data['main'])))
+    print(data_path)
+    return project_path / data_path
+
+
+def load_spike_train(data_path, channel_id, unit_id):
     root_group = exdir.File(data_path, "r", plugins=[exdir.plugins.quantities,
                                                 exdir.plugins.git_lfs])
-    unit_group = root_group[unit_path]
+    u_path = unit_path(channel_id, unit_id)
+    unit_group = root_group[u_path]
     # spiketrain data
     sptr_group = unit_group
     metadata = {}
     times = np.array(sptr_group['times'].data)
-
-    # Remove spikes that fall outside the range of times.
-    # Otherwise, interpolation will fail when plotting spikes in scatter plot.
-    times_count_before = len(times)
-    times = times[(times > min(t)) & (times < max(t))]
-    times_count_after = len(times)
-    times_count_diff = times_count_before - times_count_after
-
-    # if times_count_diff != 0:
-        # print("Removed {} spikes that fell outside range of valid position data.".format(times_count_diff))
 
     t_stop = sptr_group.parent.attrs['stop_time']
     t_start = sptr_group.parent.attrs['start_time']
@@ -289,4 +327,3 @@ def load_spike_train(data_path, unit_path, t):
                       sampling_rate=None,
                       **metadata)
     return sptr
-
