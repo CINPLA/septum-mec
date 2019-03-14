@@ -19,25 +19,6 @@ def _cut_to_same_len(*args):
     return out
 
 
-def project_path():
-    result = pathlib.Path(os.environ.get("CHARLOTTE_PNN_MEC_DATA"))
-    if result is None:
-        raise Exception("Need to set `CHARLOTTE_PNN_MEC_DATA` as environment variable first.")
-    return result
-
-
-def fftcorrelate2d(arr1, arr2, mode='full', normalize=False):
-    # TODO replace with astropy, just make sure the results are the same first
-    from scipy.signal import fftconvolve
-    if normalize:
-        a_ = np.reshape(arr1, (1, arr1.size))
-        v_ = np.reshape(arr2, (1, arr2.size))
-        arr1 = (arr1 - np.mean(a_)) / (np.std(a_) * len(a_))
-        arr2 = (arr2 - np.mean(v_)) / np.std(v_)
-    corr = fftconvolve(arr1, np.fliplr(np.flipud(arr2)), mode=mode)
-    return corr
-
-
 def velocity_threshold(x, y, t, threshold):
     """
     Removes values above threshold
@@ -59,6 +40,7 @@ def velocity_threshold(x, y, t, threshold):
     y[speed_lim] = np.nan
     x, y, t = rm_nans(x, y, t)
     return x, y, t
+
 
 def select_best_position(x1, y1, t1, x2, y2, t2, speed_filter=5):
     """
@@ -150,8 +132,8 @@ def interp_filt_position(x, y, tm, box_xlen=1 , box_ylen=1 ,
             "outside box: min [x, y] = [{}, {}], ".format(x.min(), y.min()) +
             "max [x, y] = [{}, {}]".format(x.max(), y.max()))
 
-    R = np.sqrt(np.diff(x)**2 + np.diff(y)**2)
-    V = R / np.diff(t)
+    # R = np.sqrt(np.diff(x)**2 + np.diff(y)**2)
+    # V = R / np.diff(t)
     # print('Maximum speed {}'.format(V.max()))
     return x, y, t
 
@@ -181,70 +163,58 @@ def unit_path(channel_id, unit_id):
     return "/processing/electrophysiology/channel_group_{}/UnitTimes/{}".format(channel_id, unit_id)
 
 
-def load_data(data_path, unit_path, par):
-    raise DeprecationWarning("load_data is deprecated. Use load_tracking and load_spike_train instead.")
-    x, y, t, speed = load_tracking(data_path, par)
-    sptr = load_spike_train(data_path, unit_path, t)
-    return x, y, t, speed, sptr
-
-
-def load_leds(data_path, par):
-    plugins = [exdir.plugins.quantities, exdir.plugins.git_lfs]
-    root_group = exdir.File(data_path, "r", plugins=plugins)
+def load_leds(data_path):
+    root_group = exdir.File(
+        data_path, "r",
+        plugins=[exdir.plugins.quantities, exdir.plugins.git_lfs])
 
     # tracking data
     position_group = root_group['processing']['tracking']['camera_0']['Position']
+    stop_time = position_group.attrs["stop_time"]
     x1, y1 = position_group['led_0']['data'].data.T
     t1 = position_group['led_0']['timestamps'].data
     x2, y2 = position_group['led_1']['data'].data.T
     t2 = position_group['led_1']['timestamps'].data
 
-    nans = (np.isnan(x1) | np.isnan(x2) | np.isnan(y1) | np.isnan(y2))
+    return x1, y1, t1, x2, y2, t2, stop_time
 
-    stop_time = position_group.attrs.to_dict()["stop_time"]
-    time_mask = (t1 <= stop_time)
 
-    mask = (time_mask & ~nans)
+def filter_xy_zero(x, y, t):
+    idxs, = np.where((x == 0) & (y == 0))
+    return [np.delete(a, idxs) for a in [x, y, t]]
 
-    x1 = x1[np.where(mask)]
-    y1 = y1[np.where(mask)]
-    t1 = t1[np.where(mask)]
-    x2 = x2[np.where(mask)]
-    y2 = y2[np.where(mask)]
-    t2 = t2[np.where(mask)]
 
-    dt = np.diff(t1)
-    dx = np.diff(x1)
-    dy = np.diff(y1)
+def load_head_direction(data_path, par):
+    from head_direction.head import head_direction
+    x1, y1, t1, x2, y2, t2, stop_time = load_leds(data_path)
 
-    vel = np.array([dx, dy]) / dt
-    speed = np.linalg.norm(vel, axis=0)
-    speed_mask = (speed < 5)
-    speed_mask = np.append(speed_mask, 0)
+    # x, y, t = select_best_position(x1, y1, t1, x2, y2, t2) # best time
 
-    x1 = x1[np.where(speed_mask)]
-    y1 = y1[np.where(speed_mask)]
-    t1 = t1[np.where(speed_mask)]
-    x2 = x2[np.where(speed_mask)]
-    y2 = y2[np.where(speed_mask)]
-    t2 = t2[np.where(speed_mask)]
+    x1, y1, t1 = rm_nans(x1, y1, t1)
+    x2, y2, t2 = rm_nans(x2, y2, t2)
 
-    return x1, y1, t1, x2, y2, t2
+    x1, y1, t1 = filter_xy_zero(x1, y1, t1)
+    x2, y2, t2 = filter_xy_zero(x2, y2, t2)
+
+    x1, y1, t1 = interp_filt_position(x1, y1, t1, pos_fs=par['pos_fs'], f_cut=par['f_cut'])
+    x2, y2, t2 = interp_filt_position(x2, y2, t2, pos_fs=par['pos_fs'], f_cut=par['f_cut'])
+
+    x1, y1, t1, x2, y2, t2 = _cut_to_same_len(x1, y1, t1, x2, y2, t2)
+    
+    mask1 = t1 <= stop_time
+    mask2 = t2 <= stop_time
+    #mask = t2 <= stop_time
+    x1, y1, t1 = x1[mask1], y1[mask1], t1[mask1]
+    x2, y2, t2 = x2[mask2], y2[mask2], t2[mask2]
+    angles, times = head_direction(x1, y1, x2, y2, t1)
+    return angles, times
 
 
 def load_tracking(data_path, par):
-    root_group = exdir.File(data_path, "r", plugins=[exdir.plugins.quantities,
-                                                exdir.plugins.git_lfs])
-
-    # tracking data
-    position_group = root_group['processing']['tracking']['camera_0']['Position']
-    stop_time = position_group.attrs.to_dict()["stop_time"]
-    x1, y1 = position_group['led_0']['data'].data.T
-    t1 = position_group['led_0']['timestamps'].data
-    x2, y2 = position_group['led_1']['data'].data.T
-    t2 = position_group['led_1']['timestamps'].data
+    x1, y1, t1, x2, y2, t2, stop_time = load_leds(data_path)
 
     x, y, t = select_best_position(x1, y1, t1, x2, y2, t2)
+    x, y, t = filter_xy_zero(x, y, t)
     x, y, t = interp_filt_position(x, y, t, pos_fs=par['pos_fs'], f_cut=par['f_cut'])
     mask = t <= stop_time
     #mask = t2 <= stop_time
