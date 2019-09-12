@@ -1,234 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import quantities as pq
-import neo
+from spike_statistics.core import bootstrap, permutation_resampling
 
 
-def plot_raster(trials, color="#3498db", lw=1, ax=None, marker='.', marker_size=10,
-                ylabel='Trials', id_start=0, ylim=None):
-    """
-    Raster plot of trials
-    Parameters
-    ----------
-    trials : list of neo.SpikeTrains
-    color : color of spikes
-    lw : line width
-    ax : matplotlib axes
-    Returns
-    -------
-    out : axes
-    """
-    from matplotlib.ticker import MaxNLocator
-    if ax is None:
-        fig, ax = plt.subplots()
-    trial_id = []
-    spikes = []
-    dim = trials[0].times.dimensionality
-    for n, trial in enumerate(trials):  # TODO what about empty trials?
-        n += id_start
-        spikes.extend(trial.times.magnitude)
-        trial_id.extend([n]*len(trial.times))
-    if marker_size is None:
-        heights = 6000./len(trials)
-        if heights < 0.9:
-            heights = 1.  # min size
-    else:
-        heights = marker_size
-    ax.scatter(spikes, trial_id, marker=marker, s=heights, lw=lw, color=color,
-               edgecolors='face')
-    if ylim is None:
-        ax.set_ylim(-0.5, len(trials)-0.5)
-    elif ylim is True:
-        ax.set_ylim(ylim)
-    else:
-        pass
-    y_ax = ax.axes.get_yaxis()  # Get X axis
-    y_ax.set_major_locator(MaxNLocator(integer=True))
-    t_start = trials[0].t_start.rescale(dim)
-    t_stop = trials[0].t_stop.rescale(dim)
-    ax.set_xlim([t_start, t_stop])
-    ax.set_xlabel("Times [{}]".format(dim))
-    if ylabel is not None:
-        ax.set_ylabel(ylabel)
-    return ax
+def plot_psth(spike_times, stim_times, start_time, stop_time, binsize):
+    fig, axs = plt.subplots(2, 1, sharex=True)
+    trials = [spike_times[(spike_times > t + start_time) & (spike_times <= t + stop_time)] - t for t in stim_times]
+    trials_ids = [[i]*len(t) for i, t in enumerate(trials)]
+
+    trials_flat = [s for t in trials for s in t]
+    trials_ids_flat = [s for t in trials_ids for s in t]
+
+    axs[1].scatter(trials_flat, trials_ids_flat, s=1)
+    bins = np.arange(start_time, stop_time + binsize, binsize)
+    axs[0].hist(trials_flat, bins=bins);
 
 
-def plot_psth(trials,
-              fig=None, axs=None, legend_loc=1, color='b',
-              stim_alpha=.2, stim_color=None,
-              stim_label='Stim on', stim_duraton=None, stim_offset=0*pq.s,
-              rast_ylabel='Trials', rast_size=10,
-              hist_color=None, hist_edgecolor=None,
-              hist_ylim=None,  hist_ylabel=None,
-              hist_output='counts', hist_binsize=None, hist_nbins=100,
-              hist_alpha=1.):
-    """
-    Visualize clustering on amplitude at detection point
-    Parameters
-    ----------
-    trials : list of cut neo.SpikeTrains with same number of recording channels
-    fig : matplotlib figure
-    axs : matplotlib axes (must be 2)
-    legend_loc : 'outside' or matplotlib standard loc
-    color : color of spikes
-    title : figure title
-    stim_alpha : float
-    stim_color : str
-    stim_label : str
-    stim_duraton : float
-    stim_offset : pq.Quantity
-        The amount of offset for the stimulus relative to epoch.
-    rast_ylabel : str
-    hist_color : str
-    hist_edgecolor : str
-    hist_ylim : list
-    hist_ylabel : str
-    hist_output : str
-        Accepts 'counts', 'rate' or 'mean'.
-    hist_binsize : pq.Quantity
-    hist_nbins : int
-    Returns
-    -------
-    out : fig
-    """
-    if fig is None and axs is None:
-        fig, (hist_ax, rast_ax) = plt.subplots(2, 1, sharex=True)
-    elif fig is not None and axs is None:
-        hist_ax = fig.add_subplot(2, 1, 1)
-        rast_ax = fig.add_subplot(2, 1, 2, sharex=hist_ax)
-    else:
-        assert len(axs) == 2
-        hist_ax, rast_ax = axs
-
-    dim = trials[0].times.dimensionality
-
-    # raster
-    plot_raster(trials, color=color, ax=rast_ax, ylabel=rast_ylabel,
-                marker_size=rast_size)
-    # histogram
-    hist_color = color if hist_color is None else hist_color
-    hist_ylabel = hist_output if hist_ylabel is None else hist_ylabel
-    plot_spike_histogram(trials, color=hist_color, ax=hist_ax,
-                         output=hist_output, binsize=hist_binsize,
-                         nbins=hist_nbins, edgecolor=hist_edgecolor,
-                         ylabel=hist_ylabel, alpha=hist_alpha)
-    if hist_ylim is not None: hist_ax.set_ylim(hist_ylim)
-    # stim representation
-    stim_color = color if stim_color is None else stim_color
-    if stim_duraton:
-        fill_stop = stim_duration
-        import matplotlib.patches as mpatches
-        line = mpatches.Patch([], [], color=stim_color, label=stim_label,
-                              alpha=stim_alpha)
-
-        stim_offset = stim_offset.rescale(dim).magnitude
-        hist_ax.axvspan(stim_offset, fill_stop + stim_offset, color=stim_color,
-                        alpha=stim_alpha, zorder=0)
-        rast_ax.axvspan(stim_offset, fill_stop + stim_offset, color=stim_color,
-                        alpha=stim_alpha, zorder=0)
-        if legend_loc == 'outside':
-            hist_ax.legend(handles=[line], bbox_to_anchor=(0., 1.02, 1., .102),
-                           loc=4, ncol=2, borderaxespad=0.)
-        else:
-            hist_ax.legend(handles=[line], loc=legend_loc, ncol=2, borderaxespad=0.)
-    return fig
-
-
-def plot_spike_histogram(trials, color='b', ax=None, binsize=None, bins=None,
-                         output='counts', edgecolor=None, alpha=1., ylabel=None,
-                         nbins=None):
-    """
-    histogram plot of trials
-
-    Parameters
-    ----------
-    trials : list of neo.SpikeTrains
-    color : str
-        Color of histogram.
-    edgecolor : str
-        Color of histogram edges.
-    ax : matplotlib axes
-    output : str
-        Accepts 'counts', 'rate' or 'mean'.
-    binsize :
-        Binsize of spike rate histogram, default None, if not None then
-        bins are overridden.
-    nbins : int
-        Number of bins, defaults to 100 if binsize is None.
-    ylabel : str
-        The ylabel of the plot, if None defaults to output type.
-
-    Examples
-    --------
-    >>> import neo
-    >>> from numpy.random import rand
-    >>> from exana.stimulus import make_spiketrain_trials
-    >>> spike_train = neo.SpikeTrain(rand(1000) * 10, t_stop=10, units='s')
-    >>> epoch = neo.Epoch(times=np.arange(0, 10, 1) * pq.s,
-    ...                   durations=[.5] * 10 * pq.s)
-    >>> trials = make_spiketrain_trials(spike_train, epoch)
-    >>> ax = plot_spike_histogram(trials, color='r', edgecolor='b',
-    ...                           binsize=1 * pq.ms, output='rate', alpha=.5)
-
-    .. plot::
-
-        import matplotlib.pyplot as plt
-        import numpy as np
-        import quantities as pq
-        import neo
-        from numpy.random import rand
-        from exana.stimulus import make_spiketrain_trials
-        from statistics_plot import plot_spike_histogram
-        spike_train = neo.SpikeTrain(rand(1000) * 10, t_stop=10, units='s')
-        epoch = neo.Epoch(times=np.arange(0, 10, 1) * pq.s, durations=[.5] * 10 * pq.s)
-        trials = make_spiketrain_trials(spike_train, epoch)
-        ax = plot_spike_histogram(trials, color='r', edgecolor='b', binsize=1 * pq.ms, output='rate', alpha=.5)
-        plt.show()
-
-    Returns
-    -------
-    out : axes
-    """
-    ### TODO
-    if bins is not None:
-        assert isinstance(bins, int)
-        warnings.warn('The variable "bins" is deprecated, use nbins in stead.')
-        nbins = bins
-    ###
-    if ax is None:
-        fig, ax = plt.subplots(1, 1)
-    from elephant.statistics import time_histogram
-    dim = trials[0].times.dimensionality
-    t_start = trials[0].t_start.rescale(dim)
-    t_stop = trials[0].t_stop.rescale(dim)
-    if binsize is None:
-        if nbins is None:
-            nbins = 100
-        binsize = (abs(t_start)+abs(t_stop))/float(nbins)
-    else:
-        binsize = binsize.rescale(dim)
-    time_hist = time_histogram(trials, binsize, t_start=t_start,
-                               t_stop=t_stop, output=output, binary=False)
-    bs = np.arange(t_start.magnitude, t_stop.magnitude, binsize.magnitude)
-    if ylabel is None:
-        if output == 'counts':
-            ax.set_ylabel('count')
-        elif output == 'rate':
-            time_hist = time_hist.rescale('Hz')
-            if ylabel:
-                ax.set_ylabel('rate [%s]' % time_hist.dimensionality)
-        elif output == 'mean':
-            ax.set_ylabel('mean count')
-    elif isinstance(ylabel, str):
-        ax.set_ylabel(ylabel)
-    else:
-        raise TypeError('ylabel must be str not "' + str(type(ylabel)) + '"')
-    ax.bar(bs[:len(time_hist)], time_hist.magnitude.flatten(), width=bs[1]-bs[0],
-           edgecolor=edgecolor, facecolor=color, alpha=alpha, align='edge')
-    return ax
-
-
-def plot_waveforms(sptr, color='r', fig=None, title='waveforms', lw=2, gs=None):
+def plot_waveforms(sptr, fig=None, gs=None, f=None, n=None, **kwargs):
     """
     Visualize waveforms on respective channels
 
@@ -243,6 +31,7 @@ def plot_waveforms(sptr, color='r', fig=None, title='waveforms', lw=2, gs=None):
     -------
     out : fig
     """
+    f = f if f is not None else lambda x, axis: x.T
     import matplotlib.gridspec as gridspec
     nrc = sptr.waveforms.shape[1]
     if fig is None:
@@ -256,22 +45,134 @@ def plot_waveforms(sptr, color='r', fig=None, title='waveforms', lw=2, gs=None):
             gs0 = gridspec.GridSpecFromSubplotSpec(1, nrc, subplot_spec=gs)
             ax = fig.add_subplot(gs0[:, c], sharex=ax, sharey=ax)
         axs.append(ax)
-    for c in range(nrc):
         wf = sptr.waveforms[:, c, :]
-        m = np.mean(wf, axis=0)
-        stime = np.arange(m.size, dtype=np.float32)/sptr.sampling_rate
+        n_spikes = wf.shape[0]
+        stime = np.arange(wf.shape[1], dtype=np.float32) / sptr.sampling_rate
         stime.units = 'ms'
-        sd = np.std(wf, axis=0)
-        axs[c].plot(stime, m, color=color, lw=lw)
-        axs[c].fill_between(stime, m-sd, m+sd, alpha=.1, color=color)
-        if sptr.left_sweep is not None:
-            sptr.left_sweep.units = 'ms'
-            axs[c].axvspan(sptr.left_sweep, sptr.left_sweep, color='k',
-                           ls='--')
+        if n is not None:
+            idxs = np.random.choice(np.arange(n_spikes), size=n)
+        else:
+            idxs = np.arange(n_spikes)
+
+        axs[c].plot(stime, f(wf[idxs,:], axis=0), **kwargs)
+        m = np.mean(wf[idxs,:], axis=0)
+        sd = np.std(wf[idxs,:], axis=0)
+        axs[c].fill_between(stime, m-sd, m+sd, alpha=.1, color=kwargs.get('color'))
         axs[c].set_xlabel(stime.dimensionality)
         axs[c].set_xlim([stime.min(), stime.max()])
         if c > 0:
             plt.setp(axs[c].get_yticklabels(), visible=False)
     axs[0].set_ylabel(r'amplitude $\pm$ std [%s]' % wf.dimensionality)
-    fig.suptitle(title)
     return fig
+
+
+def plot_bootstrap_timeseries(times, signals, num_samples=1000, statistic=None, alpha=0.05, ax=None, **kwargs):
+    '''
+    times : array
+        time for signal
+    signals : array or list of signals
+        each row is a signal, each column is a timepoint
+    num_samples : int
+        The number of repetitions of random samples of your data.
+    statistic : function(2darray, axis)
+        The statistic you want to build the ci. Default is mean
+    alpha : float
+        confidence, 0.05 gives 95 %
+    '''
+    statistic = statistic or np.mean
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    cis = []
+    values = []
+    for signal in signals:
+        ci = bootstrap(signal, num_samples=num_samples, statistic=statistic)
+        cis.append(ci)
+        values.append(statistic(signal))
+    cis = np.array(cis)
+    ax.plot(times, values, **kwargs)
+    ax.fill_between(times, cis[:,0], cis[:,1], alpha=.5, color=kwargs.get('color'))
+
+
+def violinplot(control, chabc, xticks=["Control", "chABC"], test='mann_whitney'):
+    if test == 'mann_whitney':
+        Uvalue, pvalue = scipy.stats.mannwhitneyu(control, chabc, alternative='two-sided')
+        print("U-test: U value", Uvalue, 'p value', pvalue)
+    elif test == 'permutation_resampling':
+        pvalue, observed_diff, diffs = permutation_resampling(control, chabc, statistic=np.median)
+        print("P-test: diff", observed_diff, 'p value', pvalue)
+    else:
+        raise KeyError('Unable to recognize {}'.format(test))
+
+    pos = [0.0, 0.6]
+
+    violins = plt.violinplot([control, chabc], pos, showmedians=True, showextrema=False)
+
+#     for i, body in enumerate(violins['bodies']):
+#         body.set_color('C{}'.format(i))
+#         body.set_linewidth(2)#         body.set_linewidth(2)
+    violins['bodies'][0].set_color ('#2166ac')
+    violins['bodies'][1].set_color ('#b2182b')
+    violins['bodies'][0].set_color ('#053061')
+    violins['bodies'][1].set_color ('#67001f')
+    violins['bodies'][0].set_color ('#4393c3')
+    violins['bodies'][1].set_color ('#d6604d')
+    violins['bodies'][0].set_alpha (0.8)
+    violins['bodies'][1].set_alpha (0.8)
+
+    # for i, body in enumerate(violins['cbars']):
+    #     body.set_color('C{}'.format(i))
+
+    for category in ['cbars', 'cmins', 'cmaxes', 'cmedians']:
+        if category in violins:
+            violins[category].set_color(['k', 'k'])
+            violins[category].set_linewidth(2.0)
+
+    # significance
+    if pvalue < 0.0001:
+        significance = "****"
+    elif pvalue < 0.001:
+        significance = "***"
+    elif pvalue < 0.01:
+        significance = "**"
+    elif pvalue < 0.05:
+        significance = "*"
+    else:
+        significance = "ns"
+
+    plt.xticks(pos, xticks)
+
+    x1, x2 = pos
+    data_max = np.max([max(control), max(chabc)])
+    data_min = np.min([min(control), min(chabc)])
+    y = data_max * 1.05
+    h = 0.025 * (data_max - data_min)
+    plt.plot([x1, x1, x2, x2], [y - h, y, y, y - h], c='k')
+    plt.text((x1 + x2) / 2, y + h, significance, ha='center', va='bottom')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+
+
+def despine(ax=None, left=False, right=True, top=True, bottom=False,
+            xticks=True, yticks=True):
+    """
+    Removes axis lines
+    """
+    if ax is None:
+        ax = plt.gcf().get_axes()
+    if not isinstance(ax, (list, tuple)):
+        ax = [ax]
+    for a in ax:
+        try:
+            a.spines['top'].set_visible(not top)
+            a.spines['right'].set_visible(not right)
+            a.spines['left'].set_visible(not left)
+            a.spines['bottom'].set_visible(not bottom)
+        except KeyError:
+            pass
+
+        if not xticks:
+            a.get_xaxis().tick_bottom()
+            plt.setp(a.get_xticklabels(), visible=False)
+        if not yticks:
+            a.get_yaxis().tick_left()
+            plt.setp(a.get_yticklabels(), visible=False)
