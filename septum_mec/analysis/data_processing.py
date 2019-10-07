@@ -10,6 +10,7 @@ import quantities as pq
 import spikeextractors as se
 import expipe
 import spatial_maps as sp
+import warnings
 
 
 def project_path():
@@ -105,8 +106,7 @@ def velocity_filter(x, y, t, threshold):
     return x, y, t
 
 
-def interp_filt_position(x, y, tm, box_xlen=1 , box_ylen=1 ,
-                         fs=100 , f_cut=10 ):
+def interp_filt_position(x, y, tm, fs=100 , f_cut=10 ):
     """
     rapid head movements will contribute to velocity artifacts,
     these can be removed by low-pass filtering
@@ -142,14 +142,6 @@ def interp_filt_position(x, y, tm, box_xlen=1 , box_ylen=1 ,
     # we tolerate small interpolation errors
     x[(x > -1e-3) & (x < 0.0)] = 0.0
     y[(y > -1e-3) & (y < 0.0)] = 0.0
-    if np.isnan(x).any() and np.isnan(y).any():
-        raise ValueError('nans found in  position, ' +
-            'x nans = %i, y nans = %i' % (sum(np.isnan(x)), sum(np.isnan(y))))
-    if (x.min() < 0 or x.max() > box_xlen or y.min() < 0 or y.max() > box_ylen):
-        raise ValueError(
-            "Interpolation produces path values " +
-            "outside box: min [x, y] = [{}, {}], ".format(x.min(), y.min()) +
-            "max [x, y] = [{}, {}]".format(x.max(), y.max()))
 
     return x, y, t
 
@@ -187,6 +179,7 @@ def load_leds(data_path):
     # tracking data
     position_group = root_group['processing']['tracking']['camera_0']['Position']
     stop_time = position_group.attrs["stop_time"]
+    print(position_group['led_0']['data'].directory)
     x1, y1 = position_group['led_0']['data'].data.T
     t1 = position_group['led_0']['timestamps'].data
     x2, y2 = position_group['led_1']['data'].data.T
@@ -199,35 +192,66 @@ def filter_xy_zero(x, y, t):
     idxs, = np.where((x == 0) & (y == 0))
     return [np.delete(a, idxs) for a in [x, y, t]]
 
+def filter_xy_box_size(x, y, t, box_size):
+    idxs, = np.where((x > box_size[0]) | (x < 0) | (y > box_size[1]) | (y < 0))
+    return [np.delete(a, idxs) for a in [x, y, t]]
 
-def load_head_direction(data_path, pos_fs, f_cut):
+
+def filter_t_zero_duration(x, y, t, duration):
+    idxs, = np.where((t < 0) | (t > duration))
+    return [np.delete(a, idxs) for a in [x, y, t]]
+
+
+def load_head_direction(data_path, sampling_rate, low_pass_frequency, box_size):
     from head_direction.head import head_direction
     x1, y1, t1, x2, y2, t2, stop_time = load_leds(data_path)
 
     x1, y1, t1 = rm_nans(x1, y1, t1)
     x2, y2, t2 = rm_nans(x2, y2, t2)
 
+    x1, y1, t1 = filter_t_zero_duration(x1, y1, t1, stop_time.magnitude)
+    x2, y2, t2 = filter_t_zero_duration(x2, y2, t2, stop_time.magnitude)
+
+    # OE saves 0.0 when signal is lost, these can be removed
     x1, y1, t1 = filter_xy_zero(x1, y1, t1)
     x2, y2, t2 = filter_xy_zero(x2, y2, t2)
 
-    x1, y1, t1 = interp_filt_position(x1, y1, t1, fs=pos_fs, f_cut=f_cut)
-    x2, y2, t2 = interp_filt_position(x2, y2, t2, fs=pos_fs, f_cut=f_cut)
+    # x1, y1, t1 = filter_xy_box_size(x1, y1, t1, box_size)
+    # x2, y2, t2 = filter_xy_box_size(x2, y2, t2, box_size)
+
+    x1, y1, t1 = interp_filt_position(x1, y1, t1,
+        fs=sampling_rate, f_cut=low_pass_frequency)
+    x2, y2, t2 = interp_filt_position(x2, y2, t2,
+        fs=sampling_rate, f_cut=low_pass_frequency)
 
     x1, y1, t1, x2, y2, t2 = _cut_to_same_len(x1, y1, t1, x2, y2, t2)
 
-    mask1 = t1 <= stop_time
-    mask2 = t2 <= stop_time
+    check_valid_tracking(x1, y1, box_size)
+    check_valid_tracking(x2, y2, box_size)
 
-    x1, y1, t1 = x1[mask1], y1[mask1], t1[mask1]
-    x2, y2, t2 = x2[mask2], y2[mask2], t2[mask2]
     angles, times = head_direction(x1, y1, x2, y2, t1)
     return angles, times
 
 
-def load_tracking(data_path, sampling_rate, low_pass_frequency, velocity_threshold=5):
+def check_valid_tracking(x, y, box_size):
+    if np.isnan(x).any() and np.isnan(y).any():
+        raise ValueError('nans found in  position, ' +
+            'x nans = %i, y nans = %i' % (sum(np.isnan(x)), sum(np.isnan(y))))
+
+    if (x.min() < 0 or x.max() > box_size[0] or y.min() < 0 or y.max() > box_size[1]):
+        warnings.warn(
+            "Invalid values found " +
+            "outside box: min [x, y] = [{}, {}], ".format(x.min(), y.min()) +
+            "max [x, y] = [{}, {}]".format(x.max(), y.max()))
+
+
+def load_tracking(data_path, sampling_rate, low_pass_frequency, box_size, velocity_threshold=5):
     x1, y1, t1, x2, y2, t2, stop_time = load_leds(data_path)
     x1, y1, t1 = rm_nans(x1, y1, t1)
     x2, y2, t2 = rm_nans(x2, y2, t2)
+
+    x1, y1, t1 = filter_t_zero_duration(x1, y1, t1, stop_time.magnitude)
+    x2, y2, t2 = filter_t_zero_duration(x2, y2, t2, stop_time.magnitude)
 
     # select data with least nan
     if len(x1) > len(x2):
@@ -238,16 +262,15 @@ def load_tracking(data_path, sampling_rate, low_pass_frequency, velocity_thresho
     # OE saves 0.0 when signal is lost, these can be removed
     x, y, t = filter_xy_zero(x, y, t)
 
+    # x, y, t = filter_xy_box_size(x, y, t, box_size)
+
     # remove velocity artifacts
     x, y, t = velocity_filter(x, y, t, velocity_threshold)
 
     x, y, t = interp_filt_position(
         x, y, t, fs=sampling_rate, f_cut=low_pass_frequency)
-    mask = t <= stop_time
-    #mask = t2 <= stop_time
-    x = x[mask]
-    y = y[mask]
-    t = t[mask]
+
+    check_valid_tracking(x, y, box_size)
 
     vel = np.gradient([x, y], axis=1) / np.gradient(t)
     speed = np.linalg.norm(vel, axis=0)
@@ -362,132 +385,6 @@ def get_unit_id(unit):
     return uid
 
 
-class Template:
-    def __init__(self, sptr):
-        self.data = np.array(sptr.waveforms.mean(0))
-        self.sampling_rate = float(sptr.sampling_rate)
-
-
-class Data:
-    def __init__(self, **kwargs):
-        self.project_path = project_path()
-        self.params = kwargs
-        self.project = expipe.get_project(self.project_path)
-        self.actions = self.project.actions
-        self._spike_trains = {}
-        self._templates = {}
-        self._stim_times = {}
-        self._tracking = {}
-        self._head_direction = {}
-        self._lfp = {}
-        self._occupancy = {}
-        self._prob_dist = {}
-        self._spatial_bins = None
-
-    def data_path(self, action_id):
-        return pathlib.Path(self.project_path) / "actions" / action_id / "data" / "main.exdir"
-
-    def duration(self, action_id):
-        return get_duration(self.data_path(action_id))
-
-    def tracking(self, action_id):
-        if action_id not in self._tracking:
-            x, y, t, speed = load_tracking(
-                self.data_path(action_id),
-                self.params['position_sampling_rate'],
-                self.params['position_low_pass_frequency'])
-            self._tracking[action_id] = {
-                'x': x, 'y': y, 't': t, 'v': speed
-            }
-        return self._tracking[action_id]
-
-    @property
-    def spatial_bins(self):
-        if self._spatial_bins is None:
-            box_size_, bin_size_ = sp.maps._adjust_bin_size(
-                box_size=self.params['box_size'],
-                bin_size=self.params['bin_size'])
-            xbins, ybins = sp.maps._make_bins(box_size_, bin_size_)
-            self._spatial_bins = (xbins, ybins)
-            self.box_size_, self.bin_size_ = box_size_, bin_size_
-        return self._spatial_bins
-
-    def occupancy(self, action_id):
-        if action_id not in self._occupancy:
-            xbins, ybins = self.spatial_bins
-
-            occupancy_map = sp.maps._occupancy_map(
-                self.tracking(action_id)['x'],
-                self.tracking(action_id)['y'],
-                self.tracking(action_id)['t'], xbins, ybins)
-            self._occupancy[action_id] = occupancy_map
-        return self._occupancy[action_id]
-
-    def prob_dist(self, action_id):
-        if action_id not in self._prob_dist:
-            xbins, ybins = xbins, ybins = self.spatial_bins
-            prob_dist = sp.stats.prob_dist(
-                self.tracking(action_id)['x'],
-                self.tracking(action_id)['y'], bins=(xbins, ybins))
-            self._prob_dist[action_id] = prob_dist
-        return self._prob_dist[action_id]
-
-    def head_direction(self, action_id):
-        if action_id not in self._head_direction:
-            a, t = load_head_direction(
-                self.data_path(action_id),
-                self.params['position_sampling_rate'],
-                self.params['position_low_pass_frequency'])
-            self._head_direction[action_id] = {
-                'a': a, 't': t
-            }
-        return self._head_direction[action_id]
-
-    def lfp(self, action_id, channel_group):
-        if action_id not in self._lfp:
-            self._lfp[action_id] = load_lfp(
-                self.data_path(action_id), channel_group) # TODO remove artifacts
-        return self._lfp[action_id]
-
-    def template(self, action_id, channel_group, unit_id):
-        if action_id not in self._templates:
-            self._templates[action_id] = {}
-        if channel_group not in self._templates[action_id]:
-            self._templates[action_id][channel_group] = {
-                get_unit_id(st): Template(st)
-                for st in load_spiketrains(
-                    self.data_path(action_id), channel_group, load_waveforms=True)
-            }
-        return self._templates[action_id][channel_group][unit_id]
-
-    def spike_train(self, action_id, channel_group, unit_id):
-        if action_id not in self._spike_trains:
-            self._spike_trains[action_id] = {}
-        if channel_group not in self._spike_trains[action_id]:
-            self._spike_trains[action_id][channel_group] = {
-                get_unit_id(st): st
-                for st in load_spiketrains(
-                    self.data_path(action_id), channel_group, load_waveforms=False)
-            }
-        return self._spike_trains[action_id][channel_group][unit_id]
-
-    def stim_times(self, action_id):
-        if action_id not in self._stim_times:
-            epochs = load_epochs(self.data_path(action_id))
-            if len(epochs) == 0:
-                self._stim_times[action_id] = None
-            elif len(epochs) == 1:
-                stim_times = epochs[0]
-                stim_times = np.sort(np.abs(stim_times))
-                # there are some 0 times and inf times, remove those
-                stim_times = stim_times[stim_times <= self.duration(action_id)]
-                stim_times = stim_times[stim_times >= 1e-20]
-                self._stim_times[action_id] = stim_times
-            else:
-                raise ValueError('Found multiple epochs')
-        return self._stim_times[action_id]
-
-
 def load_spiketrains(data_path, channel_group=None, load_waveforms=False, t_start=0 * pq.s):
     '''
     Parameters
@@ -568,24 +465,131 @@ def load_spike_train(data_path, channel_id, unit_id, stop_time=None):
                       sampling_rate=None,
                       **metadata)
     return sptr
-#-------------------------------------------------------------------------------
-    # def read_analogsignal(self, path, cascade=True, lazy=False):
-    #     channel_group = self._exdir_directory[path]
-    #     group_id = channel_group.attrs['electrode_group_id']
-    #
-    #     for lfp_group in channel_group['LFP'].values():
-    #             ana = self.read_analogsignal(lfp_group.name,
-    #                                          cascade=cascade,
-    #                                          lazy=lazy)
-    #             chx.analogsignals.append(ana)
-    #             ana.channel_index = chx
-    #
-    #     group = self._exdir_directory[path]
-    #     signal = group["data"]
-    #     attrs = {'exdir_path': path}
-    #     attrs.update(group.attrs.to_dict())
-    #     ana = AnalogSignal(signal.data,
-    #                            units=signal.attrs["unit"],
-    #                            sampling_rate=group.attrs['sample_rate'],
-    #                            **attrs)
-    #     return ana
+
+
+class Template:
+    def __init__(self, sptr):
+        self.data = np.array(sptr.waveforms.mean(0))
+        self.sampling_rate = float(sptr.sampling_rate)
+
+
+class Data:
+    def __init__(self, **kwargs):
+        self.project_path = project_path()
+        self.params = kwargs
+        self.project = expipe.get_project(self.project_path)
+        self.actions = self.project.actions
+        self._spike_trains = {}
+        self._templates = {}
+        self._stim_times = {}
+        self._tracking = {}
+        self._head_direction = {}
+        self._lfp = {}
+        self._occupancy = {}
+        self._prob_dist = {}
+        self._spatial_bins = None
+
+    def data_path(self, action_id):
+        return pathlib.Path(self.project_path) / "actions" / action_id / "data" / "main.exdir"
+
+    def duration(self, action_id):
+        return get_duration(self.data_path(action_id))
+
+    def tracking(self, action_id):
+        if action_id not in self._tracking:
+            x, y, t, speed = load_tracking(
+                self.data_path(action_id),
+                sampling_rate=self.params['position_sampling_rate'],
+                low_pass_frequency=self.params['position_low_pass_frequency'],
+                box_size=self.params['box_size'])
+            self._tracking[action_id] = {
+                'x': x, 'y': y, 't': t, 'v': speed
+            }
+        return self._tracking[action_id]
+
+    @property
+    def spatial_bins(self):
+        if self._spatial_bins is None:
+            box_size_, bin_size_ = sp.maps._adjust_bin_size(
+                box_size=self.params['box_size'],
+                bin_size=self.params['bin_size'])
+            xbins, ybins = sp.maps._make_bins(box_size_, bin_size_)
+            self._spatial_bins = (xbins, ybins)
+            self.box_size_, self.bin_size_ = box_size_, bin_size_
+        return self._spatial_bins
+
+    def occupancy(self, action_id):
+        if action_id not in self._occupancy:
+            xbins, ybins = self.spatial_bins
+
+            occupancy_map = sp.maps._occupancy_map(
+                self.tracking(action_id)['x'],
+                self.tracking(action_id)['y'],
+                self.tracking(action_id)['t'], xbins, ybins)
+            self._occupancy[action_id] = occupancy_map
+        return self._occupancy[action_id]
+
+    def prob_dist(self, action_id):
+        if action_id not in self._prob_dist:
+            xbins, ybins = xbins, ybins = self.spatial_bins
+            prob_dist = sp.stats.prob_dist(
+                self.tracking(action_id)['x'],
+                self.tracking(action_id)['y'], bins=(xbins, ybins))
+            self._prob_dist[action_id] = prob_dist
+        return self._prob_dist[action_id]
+
+    def head_direction(self, action_id):
+        if action_id not in self._head_direction:
+            a, t = load_head_direction(
+                self.data_path(action_id),
+                sampling_rate=self.params['position_sampling_rate'],
+                low_pass_frequency=self.params['position_low_pass_frequency'],
+                box_size=self.params['box_size'])
+            self._head_direction[action_id] = {
+                'a': a, 't': t
+            }
+        return self._head_direction[action_id]
+
+    def lfp(self, action_id, channel_group):
+        if action_id not in self._lfp:
+            self._lfp[action_id] = load_lfp(
+                self.data_path(action_id), channel_group) # TODO remove artifacts
+        return self._lfp[action_id]
+
+    def template(self, action_id, channel_group, unit_id):
+        if action_id not in self._templates:
+            self._templates[action_id] = {}
+        if channel_group not in self._templates[action_id]:
+            self._templates[action_id][channel_group] = {
+                get_unit_id(st): Template(st)
+                for st in load_spiketrains(
+                    self.data_path(action_id), channel_group, load_waveforms=True)
+            }
+        return self._templates[action_id][channel_group][unit_id]
+
+    def spike_train(self, action_id, channel_group, unit_id):
+        if action_id not in self._spike_trains:
+            self._spike_trains[action_id] = {}
+        if channel_group not in self._spike_trains[action_id]:
+            self._spike_trains[action_id][channel_group] = {
+                get_unit_id(st): st
+                for st in load_spiketrains(
+                    self.data_path(action_id), channel_group, load_waveforms=False)
+            }
+        return self._spike_trains[action_id][channel_group][unit_id]
+
+    def stim_times(self, action_id):
+        if action_id not in self._stim_times:
+            epochs = load_epochs(self.data_path(action_id))
+            if len(epochs) == 0:
+                self._stim_times[action_id] = None
+            elif len(epochs) == 1:
+                stim_times = epochs[0]
+                stim_times = np.sort(np.abs(stim_times))
+                # there are some 0 times and inf times, remove those
+                stim_times = stim_times[stim_times <= self.duration(action_id)]
+                stim_times = stim_times[stim_times >= 1e-20]
+                self._stim_times[action_id] = stim_times
+            else:
+                raise ValueError('Found multiple epochs')
+        return self._stim_times[action_id]

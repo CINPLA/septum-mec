@@ -87,15 +87,13 @@ class TrackMultipleSessions:
                         score = comp.matches[ch]['dissimilarity_scores'].loc[u1, u2]
                         node1_name = comp.action_id_0 + '_' + str(u1)
                         node2_name = comp.action_id_1 + '_' + str(u2)
-                        timedelta = abs(
-                            self._actions[comp.action_id_0].datetime -
-                            self._actions[comp.action_id_1].datetime)
-                        self.graphs[ch].add_edge(node1_name, node2_name, weight=score, timedelta=timedelta)
+                        self.graphs[ch].add_edge(
+                            node1_name, node2_name, weight=score)
 
             # the graph is symmetrical
             self.graphs[ch] = self.graphs[ch].to_undirected()
 
-    def _compute_timedelta(self):
+    def compute_time_delta_edges(self):
         '''
         adds a timedelta to each of the edges
         '''
@@ -103,36 +101,36 @@ class TrackMultipleSessions:
             for n0, n1 in graph.edges():
                 action_id_0 = graph.nodes[n0]['action_id']
                 action_id_1 = graph.nodes[n1]['action_id']
-                timedelta = abs(
+                time_delta = abs(
                     self._actions[action_id_0].datetime -
                     self._actions[action_id_1].datetime)
-                graph.add_edge(n0, n1, timedelta=timedelta)
+                graph.add_edge(n0, n1, time_delta=time_delta)
 
-    def threshold_dissimilarity(self, max_dissimilarity=None):
-        self.max_dissimilarity = max_dissimilarity or self.max_dissimilarity
+    def compute_depth_delta_edges(self):
+        '''
+        adds a timedelta to each of the edges
+        '''
+        for ch, graph in self.graphs.items():
+            for n0, n1 in graph.edges():
+                action_id_0 = graph.nodes[n0]['action_id']
+                action_id_1 = graph.nodes[n1]['action_id']
+                loc_0 = self._actions[action_id_0].modules['channel_group_location'][ch]
+                loc_1 = self._actions[action_id_1].modules['channel_group_location'][ch]
+                assert loc_0 == loc_1
+                depth_0 = self._actions[action_id_0].modules['depth'][loc_0]
+                depth_1 = self._actions[action_id_0].modules['depth'][loc_1]
+
+                depth_delta = abs(depth_0 - depth_1)
+                graph.add_edge(n0, n1, depth_delta=depth_delta)
+
+    def remove_edges_above_threshold(self, key='weight', threshold=0.05):
         for ch in self.graphs:
             graph = self.graphs[ch]
             edges_to_remove = []
             for sub_graph in nx.connected_components(graph):
                 for node_id in sub_graph:
                     for n1, n2, d in graph.edges(node_id, data=True):
-                        if d['weight'] > max_dissimilarity and n2 in sub_graph: # remove all edges from the subgraph
-                            edge = set((n1, n2))
-                            if edge not in edges_to_remove:
-                                edges_to_remove.append(edge)
-            for n1, n2 in edges_to_remove:
-                graph.remove_edge(n1, n2)
-            self.graphs[ch] = graph
-
-    def threshold_timedelta(self, max_timedelta=None):
-        self.max_timedelta = max_timedelta or self.max_timedelta
-        for ch in self.graphs:
-            graph = self.graphs[ch]
-            edges_to_remove = []
-            for sub_graph in nx.connected_components(graph):
-                for node_id in sub_graph:
-                    for n1, n2, d in graph.edges(node_id, data=True):
-                        if d['timedelta'] > max_timedelta and n2 in sub_graph: # remove all edges from the subgraph
+                        if d[key] > threshold and n2 in sub_graph: # remove all edges from the subgraph
                             edge = set((n1, n2))
                             if edge not in edges_to_remove:
                                 edges_to_remove.append(edge)
