@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from spike_statistics.core import bootstrap, permutation_resampling
-
+import scipy
 
 def plot_psth(spike_times, stim_times, start_time, stop_time, binsize):
     fig, axs = plt.subplots(2, 1, sharex=True)
@@ -93,19 +93,19 @@ def plot_bootstrap_timeseries(times, signals, num_samples=1000, statistic=None, 
     ax.fill_between(times, cis[:,0], cis[:,1], alpha=.5, color=kwargs.get('color'))
 
 
-def violinplot(control, chabc, xticks=["Control", "chABC"], test='mann_whitney'):
+def violinplot(control, stimulated, xticks=["Control", "Stimulated"], test='mann_whitney'):
     if test == 'mann_whitney':
-        Uvalue, pvalue = scipy.stats.mannwhitneyu(control, chabc, alternative='two-sided')
+        Uvalue, pvalue = scipy.stats.mannwhitneyu(control, stimulated, alternative='two-sided')
         print("U-test: U value", Uvalue, 'p value', pvalue)
     elif test == 'permutation_resampling':
-        pvalue, observed_diff, diffs = permutation_resampling(control, chabc, statistic=np.median)
+        pvalue, observed_diff, diffs = permutation_resampling(control, stimulated, statistic=np.median)
         print("P-test: diff", observed_diff, 'p value', pvalue)
     else:
         raise KeyError('Unable to recognize {}'.format(test))
 
     pos = [0.0, 0.6]
 
-    violins = plt.violinplot([control, chabc], pos, showmedians=True, showextrema=False)
+    violins = plt.violinplot([control, stimulated], pos, showmedians=True, showextrema=False)
 
 #     for i, body in enumerate(violins['bodies']):
 #         body.set_color('C{}'.format(i))
@@ -142,8 +142,8 @@ def violinplot(control, chabc, xticks=["Control", "chABC"], test='mann_whitney')
     plt.xticks(pos, xticks)
 
     x1, x2 = pos
-    data_max = np.max([max(control), max(chabc)])
-    data_min = np.min([min(control), min(chabc)])
+    data_max = np.max([max(control), max(stimulated)])
+    data_min = np.min([min(control), min(stimulated)])
     y = data_max * 1.05
     h = 0.025 * (data_max - data_min)
     plt.plot([x1, x1, x2, x2], [y - h, y, y, y - h], c='k')

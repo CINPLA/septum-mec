@@ -8,6 +8,17 @@ import pathlib
 import os
 import quantities as pq
 import spikeextractors as se
+import expipe
+import spatial_maps as sp
+
+
+def project_path():
+    path = os.environ.get("SEPTUM_MEC_DATA")
+    if path is None:
+        raise Exception("Need to set `SEPTUM_MEC_DATA` as environment variable first.")
+    else:
+        path = pathlib.Path(path)
+    return path
 
 
 def view_active_channels(action, sorter):
@@ -206,7 +217,7 @@ def load_head_direction(data_path, pos_fs, f_cut):
 
     mask1 = t1 <= stop_time
     mask2 = t2 <= stop_time
-    #mask = t2 <= stop_time
+
     x1, y1, t1 = x1[mask1], y1[mask1], t1[mask1]
     x2, y2, t2 = x2[mask2], y2[mask2], t2[mask2]
     angles, times = head_direction(x1, y1, x2, y2, t1)
@@ -215,7 +226,6 @@ def load_head_direction(data_path, pos_fs, f_cut):
 
 def load_tracking(data_path, sampling_rate, low_pass_frequency, velocity_threshold=5):
     x1, y1, t1, x2, y2, t2, stop_time = load_leds(data_path)
-    x1, y1, t1, x2, y2, t2 = [a.magnitude for a in [x1, y1, t1, x2, y2, t2]]
     x1, y1, t1 = rm_nans(x1, y1, t1)
     x2, y2, t2 = rm_nans(x2, y2, t2)
 
@@ -246,13 +256,13 @@ def load_tracking(data_path, sampling_rate, low_pass_frequency, velocity_thresho
 
 
 def get_data_path(action):
-    action_path = action._backend.path
-    project_path = action_path.parent.parent
+    # action_path = action._backend.path
+    # project_path = action_path.parent.parent
     #data_path = action.data['main']
-    data_path = str(pathlib.Path(pathlib.PureWindowsPath(action.data['main'])))
+    data_path = str(action.data_path('main'))
 
-    print("Project path: {}\nData path: {}".format(project_path, data_path))
-    return project_path / data_path
+    # print("Project path: {}\nData path: {}".format(project_path, data_path))
+    return data_path
 
 
 def get_sample_rate(data_path, default_sample_rate=30000*pq.Hz):
@@ -265,6 +275,12 @@ def get_sample_rate(data_path, default_sample_rate=30000*pq.Hz):
             if 'sample_rate' in ephys.attrs.keys():
                 sr = ephys.attrs['sample_rate']
     return sr
+
+
+def get_duration(data_path):
+    f = exdir.File(str(data_path), 'r', plugins=[exdir.plugins.quantities])
+
+    return f.attrs['session_duration'].rescale('s')
 
 
 def load_lfp(data_path, channel_group):
@@ -314,6 +330,164 @@ def load_epochs(data_path):
     return epochs
 
 
+def get_channel_groups(data_path):
+    '''
+    Returns channeø groups of processing/electrophysiology
+    Parameters
+    ----------
+    data_path: Path
+        The action data path
+    Returns
+    -------
+    channel groups: list
+        The channel groups
+    '''
+    f = exdir.File(str(data_path), 'r', plugins=[exdir.plugins.quantities])
+    channel_groups = []
+    if 'processing' in f.keys():
+        processing = f['processing']
+        if 'electrophysiology' in processing.keys():
+            ephys = processing['electrophysiology']
+            for chname, ch in ephys.items():
+                if 'channel' in chname:
+                    channel_groups.append(int(chname.split('_')[-1]))
+    return channel_groups
+
+
+def get_unit_id(unit):
+    try:
+        uid = int(unit.annotations['name'].split('#')[-1])
+    except AttributeError:
+        uid = int(unit['name'].split('#')[-1])
+    return uid
+
+
+class Template:
+    def __init__(self, sptr):
+        self.data = np.array(sptr.waveforms.mean(0))
+        self.sampling_rate = float(sptr.sampling_rate)
+
+
+class Data:
+    def __init__(self, **kwargs):
+        self.project_path = project_path()
+        self.params = kwargs
+        self.project = expipe.get_project(self.project_path)
+        self.actions = self.project.actions
+        self._spike_trains = {}
+        self._templates = {}
+        self._stim_times = {}
+        self._tracking = {}
+        self._head_direction = {}
+        self._lfp = {}
+        self._occupancy = {}
+        self._prob_dist = {}
+        self._spatial_bins = None
+
+    def data_path(self, action_id):
+        return pathlib.Path(self.project_path) / "actions" / action_id / "data" / "main.exdir"
+
+    def duration(self, action_id):
+        return get_duration(self.data_path(action_id))
+
+    def tracking(self, action_id):
+        if action_id not in self._tracking:
+            x, y, t, speed = load_tracking(
+                self.data_path(action_id),
+                self.params['position_sampling_rate'],
+                self.params['position_low_pass_frequency'])
+            self._tracking[action_id] = {
+                'x': x, 'y': y, 't': t, 'v': speed
+            }
+        return self._tracking[action_id]
+
+    @property
+    def spatial_bins(self):
+        if self._spatial_bins is None:
+            box_size_, bin_size_ = sp.maps._adjust_bin_size(
+                box_size=self.params['box_size'],
+                bin_size=self.params['bin_size'])
+            xbins, ybins = sp.maps._make_bins(box_size_, bin_size_)
+            self._spatial_bins = (xbins, ybins)
+            self.box_size_, self.bin_size_ = box_size_, bin_size_
+        return self._spatial_bins
+
+    def occupancy(self, action_id):
+        if action_id not in self._occupancy:
+            xbins, ybins = self.spatial_bins
+
+            occupancy_map = sp.maps._occupancy_map(
+                self.tracking(action_id)['x'],
+                self.tracking(action_id)['y'],
+                self.tracking(action_id)['t'], xbins, ybins)
+            self._occupancy[action_id] = occupancy_map
+        return self._occupancy[action_id]
+
+    def prob_dist(self, action_id):
+        if action_id not in self._prob_dist:
+            xbins, ybins = xbins, ybins = self.spatial_bins
+            prob_dist = sp.stats.prob_dist(
+                self.tracking(action_id)['x'],
+                self.tracking(action_id)['y'], bins=(xbins, ybins))
+            self._prob_dist[action_id] = prob_dist
+        return self._prob_dist[action_id]
+
+    def head_direction(self, action_id):
+        if action_id not in self._head_direction:
+            a, t = load_head_direction(
+                self.data_path(action_id),
+                self.params['position_sampling_rate'],
+                self.params['position_low_pass_frequency'])
+            self._head_direction[action_id] = {
+                'a': a, 't': t
+            }
+        return self._head_direction[action_id]
+
+    def lfp(self, action_id, channel_group):
+        if action_id not in self._lfp:
+            self._lfp[action_id] = load_lfp(
+                self.data_path(action_id), channel_group) # TODO remove artifacts
+        return self._lfp[action_id]
+
+    def template(self, action_id, channel_group, unit_id):
+        if action_id not in self._templates:
+            self._templates[action_id] = {}
+        if channel_group not in self._templates[action_id]:
+            self._templates[action_id][channel_group] = {
+                get_unit_id(st): Template(st)
+                for st in load_spiketrains(
+                    self.data_path(action_id), channel_group, load_waveforms=True)
+            }
+        return self._templates[action_id][channel_group][unit_id]
+
+    def spike_train(self, action_id, channel_group, unit_id):
+        if action_id not in self._spike_trains:
+            self._spike_trains[action_id] = {}
+        if channel_group not in self._spike_trains[action_id]:
+            self._spike_trains[action_id][channel_group] = {
+                get_unit_id(st): st
+                for st in load_spiketrains(
+                    self.data_path(action_id), channel_group, load_waveforms=False)
+            }
+        return self._spike_trains[action_id][channel_group][unit_id]
+
+    def stim_times(self, action_id):
+        if action_id not in self._stim_times:
+            epochs = load_epochs(self.data_path(action_id))
+            if len(epochs) == 0:
+                self._stim_times[action_id] = None
+            elif len(epochs) == 1:
+                stim_times = epochs[0]
+                stim_times = np.sort(np.abs(stim_times))
+                # there are some 0 times and inf times, remove those
+                stim_times = stim_times[stim_times <= self.duration(action_id)]
+                stim_times = stim_times[stim_times >= 1e-20]
+                self._stim_times[action_id] = stim_times
+            else:
+                raise ValueError('Found multiple epochs')
+        return self._stim_times[action_id]
+
+
 def load_spiketrains(data_path, channel_group=None, load_waveforms=False, t_start=0 * pq.s):
     '''
     Parameters
@@ -326,15 +500,17 @@ def load_spiketrains(data_path, channel_group=None, load_waveforms=False, t_star
     -------
     '''
     sample_rate = get_sample_rate(data_path)
-    sorting = se.ExdirSortingExtractor(data_path, sample_rate=sample_rate.magnitude,
-                                       channel_group=channel_group, load_waveforms=load_waveforms)
+    sorting = se.ExdirSortingExtractor(
+        data_path, sample_rate=sample_rate,
+        channel_group=channel_group, load_waveforms=load_waveforms)
     sptr = []
     # build neo pbjects
     for u in sorting.get_unit_ids():
         times = sorting.get_unit_spike_train(u) / sample_rate
-        t_stop = np.max(times)
+        t_stop = get_duration(data_path)
         times = times - t_start
-        times = times[np.where(times > 0)]
+        t_stop = t_stop - t_start
+        times = times[(times > 0) & (times <= t_stop)]
         if load_waveforms and 'waveforms' in sorting.get_unit_spike_feature_names(u):
             wf = sorting.get_unit_spike_features(u, 'waveforms')
             wf = wf[np.where(times > 0)] * pq.uV
@@ -348,7 +524,29 @@ def load_spiketrains(data_path, channel_group=None, load_waveforms=False, t_star
     return sptr
 
 
-def load_spike_train(data_path, channel_id, unit_id):
+def load_unit_annotations(data_path, channel_group):
+    '''
+    Parameters
+    ----------
+    data_path
+    channel_group
+    Returns
+    -------
+    '''
+    sample_rate = get_sample_rate(data_path)
+    sorting = se.ExdirSortingExtractor(
+        data_path, sample_rate=sample_rate,
+        channel_group=channel_group, load_waveforms=False)
+    units = []
+    for u in sorting.get_unit_ids():
+        annotations = {}
+        for p in sorting.get_unit_property_names(u):
+            annotations.update({p: sorting.get_unit_property(u, p)})
+        units.append(annotations)
+    return units
+
+
+def load_spike_train(data_path, channel_id, unit_id, stop_time=None):
     root_group = exdir.File(data_path, "r", plugins=[exdir.plugins.quantities,
                                                 exdir.plugins.git_lfs])
     u_path = unit_path(channel_id, unit_id)
@@ -357,9 +555,10 @@ def load_spike_train(data_path, channel_id, unit_id):
     sptr_group = unit_group
     metadata = {}
     times = np.array(sptr_group['times'].data)
-
-    t_stop = sptr_group.parent.attrs['stop_time']
-    t_start = sptr_group.parent.attrs['start_time']
+    if stop_time is not None:
+        t_stop = stop_time
+        times = times[times < t_stop]
+    t_start = 0 * pq.s
     metadata.update(sptr_group['times'].attrs.to_dict())
     metadata.update({'exdir_path': str(data_path)})
     sptr = neo.SpikeTrain(times=times, units = 's',
