@@ -117,9 +117,10 @@ class TrackMultipleSessions:
                 loc_0 = self._actions[action_id_0].modules['channel_group_location'][ch]
                 loc_1 = self._actions[action_id_1].modules['channel_group_location'][ch]
                 assert loc_0 == loc_1
-                depth_0 = self._actions[action_id_0].modules['depth'][loc_0]
-                depth_1 = self._actions[action_id_0].modules['depth'][loc_1]
-
+                depth_0 = self._actions[action_id_0].modules['depth'][loc_0]['probe_0']
+                depth_1 = self._actions[action_id_0].modules['depth'][loc_1]['probe_0']
+                depth_0 = float(depth_0.rescale('um'))
+                depth_1 = float(depth_1.rescale('um'))
                 depth_delta = abs(depth_0 - depth_1)
                 graph.add_edge(n0, n1, depth_delta=depth_delta)
 

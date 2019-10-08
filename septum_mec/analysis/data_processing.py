@@ -179,7 +179,6 @@ def load_leds(data_path):
     # tracking data
     position_group = root_group['processing']['tracking']['camera_0']['Position']
     stop_time = position_group.attrs["stop_time"]
-    print(position_group['led_0']['data'].directory)
     x1, y1 = position_group['led_0']['data'].data.T
     t1 = position_group['led_0']['timestamps'].data
     x2, y2 = position_group['led_1']['data'].data.T
@@ -588,7 +587,7 @@ class Data:
                 stim_times = np.sort(np.abs(stim_times))
                 # there are some 0 times and inf times, remove those
                 stim_times = stim_times[stim_times <= self.duration(action_id)]
-                stim_times = stim_times[stim_times >= 1e-20]
+                # stim_times = stim_times[stim_times >= 1e-20]
                 self._stim_times[action_id] = stim_times
             else:
                 raise ValueError('Found multiple epochs')
