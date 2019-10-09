@@ -481,6 +481,7 @@ class Data:
         self._spike_trains = {}
         self._templates = {}
         self._stim_times = {}
+        self._unit_names = {}
         self._tracking = {}
         self._head_direction = {}
         self._lfp = {}
@@ -576,6 +577,28 @@ class Data:
                     self.data_path(action_id), channel_group, load_waveforms=False)
             }
         return self._spike_trains[action_id][channel_group][unit_id]
+
+    def spike_trains(self, action_id, channel_group):
+        if action_id not in self._spike_trains:
+            self._spike_trains[action_id] = {}
+        if channel_group not in self._spike_trains[action_id]:
+            self._spike_trains[action_id][channel_group] = {
+                get_unit_id(st): st
+                for st in load_spiketrains(
+                    self.data_path(action_id), channel_group, load_waveforms=False)
+            }
+        return self._spike_trains[action_id][channel_group]
+
+    def unit_names(self, action_id, channel_group):
+        if action_id not in self._unit_names:
+            self._unit_names[action_id] = {}
+        if channel_group not in self._unit_names[action_id]:
+            self._unit_names[action_id][channel_group] = [
+                get_unit_id(st)
+                for st in load_unit_annotations(
+                    self.data_path(action_id), channel_group)
+            ]
+        return self._unit_names[action_id][channel_group]
 
     def stim_times(self, action_id):
         if action_id not in self._stim_times:
