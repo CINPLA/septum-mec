@@ -1,5 +1,8 @@
+
+
 # ignore output from notebooks
 notebooks/output
+.~*
 
 # ignore HTML
 *.html

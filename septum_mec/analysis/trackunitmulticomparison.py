@@ -4,7 +4,7 @@ from .trackunitcomparison import TrackingSession
 from .data_processing import get_data_path, get_channel_groups, load_spiketrains
 from .track_units_tools import (
     get_unit_id, compute_templates, plot_waveform,
-    lighten_color, plot_template, compute_template)
+    plot_template, compute_template)
 import matplotlib.pylab as plt
 from tqdm import tqdm
 import uuid
@@ -125,6 +125,9 @@ class TrackMultipleSessions:
                 graph.add_edge(n0, n1, depth_delta=depth_delta)
 
     def remove_edges_above_threshold(self, key='weight', threshold=0.05):
+        '''
+        key: weight, depth_delta, time_delta
+        '''
         for ch in self.graphs:
             graph = self.graphs[ch]
             edges_to_remove = []

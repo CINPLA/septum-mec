@@ -93,7 +93,7 @@ def plot_bootstrap_timeseries(times, signals, num_samples=1000, statistic=None, 
     ax.fill_between(times, cis[:,0], cis[:,1], alpha=.5, color=kwargs.get('color'))
 
 
-def violinplot(control, stimulated, xticks=["Control", "Stimulated"], test='mann_whitney'):
+def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test='mann_whitney', colors=None):
     if test == 'mann_whitney':
         Uvalue, pvalue = scipy.stats.mannwhitneyu(control, stimulated, alternative='two-sided')
         print("U-test: U value", Uvalue, 'p value', pvalue)
@@ -102,7 +102,7 @@ def violinplot(control, stimulated, xticks=["Control", "Stimulated"], test='mann
         print("P-test: diff", observed_diff, 'p value', pvalue)
     else:
         raise KeyError('Unable to recognize {}'.format(test))
-
+    colors = colors if colors is not None else ['#2166ac', '#b2182b']
     pos = [0.0, 0.6]
 
     violins = plt.violinplot([control, stimulated], pos, showmedians=True, showextrema=False)
@@ -110,12 +110,9 @@ def violinplot(control, stimulated, xticks=["Control", "Stimulated"], test='mann
 #     for i, body in enumerate(violins['bodies']):
 #         body.set_color('C{}'.format(i))
 #         body.set_linewidth(2)#         body.set_linewidth(2)
-    violins['bodies'][0].set_color ('#2166ac')
-    violins['bodies'][1].set_color ('#b2182b')
-    violins['bodies'][0].set_color ('#053061')
-    violins['bodies'][1].set_color ('#67001f')
-    violins['bodies'][0].set_color ('#4393c3')
-    violins['bodies'][1].set_color ('#d6604d')
+    violins['bodies'][0].set_color(colors[0])
+    violins['bodies'][1].set_color(colors[1])
+
     violins['bodies'][0].set_alpha (0.8)
     violins['bodies'][1].set_alpha (0.8)
 
@@ -170,9 +167,31 @@ def despine(ax=None, left=False, right=True, top=True, bottom=False,
         except KeyError:
             pass
 
+        a.get_xaxis().tick_bottom()
+        plt.setp(a.get_xticklabels(), visible=xticks)
         if not xticks:
-            a.get_xaxis().tick_bottom()
-            plt.setp(a.get_xticklabels(), visible=False)
+            a.xaxis.set_ticks_position('none')
+        a.get_yaxis().tick_left()
+        plt.setp(a.get_yticklabels(), visible=yticks)
         if not yticks:
-            a.get_yaxis().tick_left()
-            plt.setp(a.get_yticklabels(), visible=False)
+            a.yaxis.set_ticks_position('none')
+
+
+def lighten_color(color, amount=0.7):
+    """
+    Lightens the given color by multiplying (1-luminosity) by the given amount.
+    Input can be matplotlib color string, hex string, or RGB tuple.
+
+    Examples:
+    >> lighten_color('g', 0.3)
+    >> lighten_color('#F034A3', 0.6)
+    >> lighten_color((.3,.55,.1), 0.5)
+    """
+    import matplotlib.colors as mc
+    import colorsys
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])

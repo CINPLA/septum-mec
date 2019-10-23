@@ -92,11 +92,7 @@ def velocity_filter(x, y, t, threshold):
     threshold : float
     """
     assert len(x) == len(y) == len(t), 'x, y, t must have same length'
-    dt = np.diff(t)
-    dx = np.diff(x)
-    dy = np.diff(y)
-
-    vel = np.array([dx, dy]) / dt
+    vel = np.gradient([x, y], axis=1) / np.gradient(t)
     speed = np.linalg.norm(vel, axis=0)
     speed_mask = (speed < threshold)
     speed_mask = np.append(speed_mask, 0)
@@ -305,10 +301,9 @@ def get_duration(data_path):
     return f.attrs['session_duration'].rescale('s')
 
 
-def load_lfp(data_path, channel_group):
+def load_lfp(data_path, channel_group, lim=None):
     f = exdir.File(str(data_path), 'r', plugins=[exdir.plugins.quantities])
     # LFP
-    t_stop = f.attrs['session_duration']
     _lfp = f['processing']['electrophysiology']['channel_group_{}'.format(channel_group)]['LFP']
     keys = list(_lfp.keys())
     electrode_value = [_lfp[key]['data'].value.flatten() for key in keys]
@@ -317,6 +312,14 @@ def load_lfp(data_path, channel_group):
     units = _lfp[keys[0]]['data'].attrs['unit']
     LFP = np.r_[[_lfp[key]['data'].value.flatten() for key in keys]].T
     LFP = LFP[:, np.argsort(electrode_idx)]
+    if lim is None:
+        t_stop = f.attrs['session_duration']
+    else:
+        assert len(lim) == 2
+        times = np.arange(lfp.shape[0]) / sampling_rate.magnitude
+        mask = (times >= lim[0]) & (times <= lim[1])
+        LFP = LFP[mask, :]
+        t_stop = lim[1]
 
     LFP = neo.AnalogSignal(
         LFP, units=units, t_stop=t_stop, sampling_rate=sampling_rate,
@@ -384,7 +387,7 @@ def get_unit_id(unit):
     return uid
 
 
-def load_spiketrains(data_path, channel_group=None, load_waveforms=False, t_start=0 * pq.s):
+def load_spiketrains(data_path, channel_group=None, load_waveforms=False, lim=None):
     '''
     Parameters
     ----------
@@ -403,13 +406,17 @@ def load_spiketrains(data_path, channel_group=None, load_waveforms=False, t_star
     # build neo pbjects
     for u in sorting.get_unit_ids():
         times = sorting.get_unit_spike_train(u) / sample_rate
-        t_stop = get_duration(data_path)
-        times = times - t_start
-        t_stop = t_stop - t_start
-        times = times[(times > 0) & (times <= t_stop)]
+        if lim is None:
+            t_stop = get_duration(data_path)
+            t_start = 0 * pq.s
+        else:
+            t_start = pq.Quantity(lim[0], 's')
+            t_stop = pq.Quantity(lim[1], 's')
+        mask = (times >= t_start) & (times <= t_stop)
+        times = times[mask]
         if load_waveforms and 'waveforms' in sorting.get_unit_spike_feature_names(u):
             wf = sorting.get_unit_spike_features(u, 'waveforms')
-            wf = wf[np.where(times > 0)] * pq.uV
+            wf = wf[mask] * pq.uV
         else:
             wf = None
         st = neo.SpikeTrain(times=times, t_stop=t_stop, waveforms=wf, sampling_rate=sample_rate)
@@ -442,30 +449,6 @@ def load_unit_annotations(data_path, channel_group):
     return units
 
 
-def load_spike_train(data_path, channel_id, unit_id, stop_time=None):
-    root_group = exdir.File(data_path, "r", plugins=[exdir.plugins.quantities,
-                                                exdir.plugins.git_lfs])
-    u_path = unit_path(channel_id, unit_id)
-    unit_group = root_group[u_path]
-    # spiketrain data
-    sptr_group = unit_group
-    metadata = {}
-    times = np.array(sptr_group['times'].data)
-    if stop_time is not None:
-        t_stop = stop_time
-        times = times[times < t_stop]
-    t_start = 0 * pq.s
-    metadata.update(sptr_group['times'].attrs.to_dict())
-    metadata.update({'exdir_path': str(data_path)})
-    sptr = neo.SpikeTrain(times=times, units = 's',
-                      t_stop=t_stop,
-                      t_start=t_start,
-                      waveforms=None,
-                      sampling_rate=None,
-                      **metadata)
-    return sptr
-
-
 class Template:
     def __init__(self, sptr):
         self.data = np.array(sptr.waveforms.mean(0))
@@ -473,7 +456,7 @@ class Template:
 
 
 class Data:
-    def __init__(self, **kwargs):
+    def __init__(self, stim_mask=False, baseline_duration=None, **kwargs):
         self.project_path = project_path()
         self.params = kwargs
         self.project = expipe.get_project(self.project_path)
@@ -486,11 +469,24 @@ class Data:
         self._head_direction = {}
         self._lfp = {}
         self._occupancy = {}
+        self._rate_maps = {}
         self._prob_dist = {}
         self._spatial_bins = None
+        self.stim_mask = stim_mask
+        self.baseline_duration = baseline_duration
 
     def data_path(self, action_id):
         return pathlib.Path(self.project_path) / "actions" / action_id / "data" / "main.exdir"
+
+    def get_lim(self, action_id):
+        stim_times = self.stim_times(action_id)
+        if stim_times is None:
+            if self.baseline_duration is None:
+                return [0, get_duration(self.data_path(action_id))]
+            else:
+                return [0, self.baseline_duration]
+        stim_times = np.array(stim_times)
+        return [stim_times.min(), stim_times.max()]
 
     def duration(self, action_id):
         return get_duration(self.data_path(action_id))
@@ -502,6 +498,13 @@ class Data:
                 sampling_rate=self.params['position_sampling_rate'],
                 low_pass_frequency=self.params['position_low_pass_frequency'],
                 box_size=self.params['box_size'])
+            if self.stim_mask:
+                t1, t2 = self.get_lim(action_id)
+                mask = (t >= t1) & (t <= t2)
+                x = x[mask]
+                y = y[mask]
+                t = t[mask]
+                speed = speed[mask]
             self._tracking[action_id] = {
                 'x': x, 'y': y, 't': t, 'v': speed
             }
@@ -538,6 +541,37 @@ class Data:
             self._prob_dist[action_id] = prob_dist
         return self._prob_dist[action_id]
 
+    def rate_map(self, action_id, channel_group, unit_name, smoothing):
+        make_rate_map = False
+        if action_id not in self._rate_maps:
+            self._rate_maps[action_id] = {}
+        if channel_group not in self._rate_maps[action_id]:
+            self._rate_maps[action_id][channel_group] = {}
+        if unit_name not in self._rate_maps[action_id][channel_group]:
+            self._rate_maps[action_id][channel_group][unit_name] = {}
+        if smoothing not in self._rate_maps[action_id][channel_group][unit_name]:
+            make_rate_map = True
+
+
+        if make_rate_map:
+            xbins, ybins = self.spatial_bins
+
+            spike_map = sp.maps._spike_map(
+                self.tracking(action_id)['x'],
+                self.tracking(action_id)['y'],
+                self.tracking(action_id)['t'],
+                self.spike_train(action_id, channel_group, unit_name),
+                xbins, ybins)
+
+            smooth_spike_map = sp.maps.smooth_map(
+                spike_map, bin_size=self.bin_size_, smoothing=smoothing)
+            smooth_occupancy_map = sp.maps.smooth_map(
+                self.occupancy(action_id), bin_size=self.bin_size_, smoothing=smoothing)
+            rate_map = smooth_spike_map / smooth_occupancy_map
+            self._rate_maps[action_id][channel_group][unit_name][smoothing] = rate_map
+
+        return self._rate_maps[action_id][channel_group][unit_name][smoothing]
+
     def head_direction(self, action_id):
         if action_id not in self._head_direction:
             a, t = load_head_direction(
@@ -545,47 +579,57 @@ class Data:
                 sampling_rate=self.params['position_sampling_rate'],
                 low_pass_frequency=self.params['position_low_pass_frequency'],
                 box_size=self.params['box_size'])
+            if self.stim_mask:
+                t1, t2 = self.get_lim(action_id)
+                mask = (t >= t1) & (t <= t2)
+                a = a[mask]
+                t = t[mask]
             self._head_direction[action_id] = {
                 'a': a, 't': t
             }
         return self._head_direction[action_id]
 
-    def lfp(self, action_id, channel_group):
+    def lfp(self, action_id, channel_group, clean_memory=False):
+        lim = self.get_lim(action_id) if self.stim_mask else None
+        if clean_memory:
+            return load_lfp(
+            self.data_path(action_id), channel_group, lim)
         if action_id not in self._lfp:
-            self._lfp[action_id] = load_lfp(
-                self.data_path(action_id), channel_group) # TODO remove artifacts
-        return self._lfp[action_id]
+            self._lfp[action_id] = {}
+        if channel_group not in self._lfp[action_id]:
+            self._lfp[action_id][channel_group] = load_lfp(
+                self.data_path(action_id), channel_group, lim)
+        return self._lfp[action_id][channel_group]
 
     def template(self, action_id, channel_group, unit_id):
         if action_id not in self._templates:
             self._templates[action_id] = {}
         if channel_group not in self._templates[action_id]:
+            lim = self.get_lim(action_id) if self.stim_mask else None
             self._templates[action_id][channel_group] = {
                 get_unit_id(st): Template(st)
                 for st in load_spiketrains(
-                    self.data_path(action_id), channel_group, load_waveforms=True)
+                    self.data_path(action_id), channel_group,
+                    load_waveforms=True,
+                    lim=lim)
             }
         return self._templates[action_id][channel_group][unit_id]
 
     def spike_train(self, action_id, channel_group, unit_id):
-        if action_id not in self._spike_trains:
-            self._spike_trains[action_id] = {}
-        if channel_group not in self._spike_trains[action_id]:
-            self._spike_trains[action_id][channel_group] = {
-                get_unit_id(st): st
-                for st in load_spiketrains(
-                    self.data_path(action_id), channel_group, load_waveforms=False)
-            }
+        self.spike_trains(action_id, channel_group)
         return self._spike_trains[action_id][channel_group][unit_id]
 
     def spike_trains(self, action_id, channel_group):
         if action_id not in self._spike_trains:
             self._spike_trains[action_id] = {}
         if channel_group not in self._spike_trains[action_id]:
+            lim = self.get_lim(action_id) if self.stim_mask else None
             self._spike_trains[action_id][channel_group] = {
                 get_unit_id(st): st
                 for st in load_spiketrains(
-                    self.data_path(action_id), channel_group, load_waveforms=False)
+                    self.data_path(action_id), channel_group,
+                    load_waveforms=False,
+                    lim=lim)
             }
         return self._spike_trains[action_id][channel_group]
 
@@ -609,7 +653,7 @@ class Data:
                 stim_times = epochs[0]
                 stim_times = np.sort(np.abs(stim_times))
                 # there are some 0 times and inf times, remove those
-                stim_times = stim_times[stim_times <= self.duration(action_id)]
+                stim_times = stim_times[stim_times <= get_duration(self.data_path(action_id))]
                 # stim_times = stim_times[stim_times >= 1e-20]
                 self._stim_times[action_id] = stim_times
             else:
