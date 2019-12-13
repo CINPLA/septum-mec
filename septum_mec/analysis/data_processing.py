@@ -316,7 +316,7 @@ def load_lfp(data_path, channel_group, lim=None):
         t_stop = f.attrs['session_duration']
     else:
         assert len(lim) == 2
-        times = np.arange(lfp.shape[0]) / sampling_rate.magnitude
+        times = np.arange(LFP.shape[0]) / sampling_rate.magnitude
         mask = (times >= lim[0]) & (times <= lim[1])
         LFP = LFP[mask, :]
         t_stop = lim[1]
@@ -400,7 +400,7 @@ def load_spiketrains(data_path, channel_group=None, load_waveforms=False, lim=No
     '''
     sample_rate = get_sample_rate(data_path)
     sorting = se.ExdirSortingExtractor(
-        data_path, sample_rate=sample_rate,
+        data_path, sampling_frequency=sample_rate,
         channel_group=channel_group, load_waveforms=load_waveforms)
     sptr = []
     # build neo pbjects
@@ -470,6 +470,7 @@ class Data:
         self._lfp = {}
         self._occupancy = {}
         self._rate_maps = {}
+        self._rate_maps_split = {}
         self._prob_dist = {}
         self._spatial_bins = None
         self.stim_mask = stim_mask
@@ -529,6 +530,9 @@ class Data:
                 self.tracking(action_id)['x'],
                 self.tracking(action_id)['y'],
                 self.tracking(action_id)['t'], xbins, ybins)
+            threshold = self.params.get('occupancy_threshold')
+            if threshold is not None:
+                occupancy_map[occupancy_map <= threshold] = 0
             self._occupancy[action_id] = occupancy_map
         return self._occupancy[action_id]
 
@@ -540,6 +544,54 @@ class Data:
                 self.tracking(action_id)['y'], bins=(xbins, ybins))
             self._prob_dist[action_id] = prob_dist
         return self._prob_dist[action_id]
+
+    def rate_map_split(self, action_id, channel_group, unit_name, smoothing):
+        make_rate_map = False
+        if action_id not in self._rate_maps_split:
+            self._rate_maps_split[action_id] = {}
+        if channel_group not in self._rate_maps_split[action_id]:
+            self._rate_maps_split[action_id][channel_group] = {}
+        if unit_name not in self._rate_maps_split[action_id][channel_group]:
+            self._rate_maps_split[action_id][channel_group][unit_name] = {}
+        if smoothing not in self._rate_maps_split[action_id][channel_group][unit_name]:
+            make_rate_map = True
+
+
+        if make_rate_map:
+            xbins, ybins = self.spatial_bins
+            x, y, t = map(self.tracking(action_id).get, ['x', 'y', 't'])
+            spikes = self.spike_train(action_id, channel_group, unit_name)
+            t_split = t[-1] / 2
+            mask_1 = t < t_split
+            mask_2 = t >= t_split
+            x_1, y_1, t_1 = x[mask_1], y[mask_1], t[mask_1]
+            x_2, y_2, t_2 = x[mask_2], y[mask_2], t[mask_2]
+            spikes_1 = spikes[spikes < t_split]
+            spikes_2 = spikes[spikes >= t_split]
+            occupancy_map_1 = sp.maps._occupancy_map(
+                x_1, y_1, t_1, xbins, ybins)
+            occupancy_map_2 = sp.maps._occupancy_map(
+                x_2, y_2, t_2, xbins, ybins)
+
+            spike_map_1 = sp.maps._spike_map(
+                x_1, y_1, t_1, spikes_1, xbins, ybins)
+            spike_map_2 = sp.maps._spike_map(
+                x_2, y_2, t_2, spikes_2, xbins, ybins)
+
+            smooth_spike_map_1 = sp.maps.smooth_map(
+                spike_map_1, bin_size=self.bin_size_, smoothing=smoothing)
+            smooth_spike_map_2 = sp.maps.smooth_map(
+                spike_map_2, bin_size=self.bin_size_, smoothing=smoothing)
+            smooth_occupancy_map_1 = sp.maps.smooth_map(
+                occupancy_map_1, bin_size=self.bin_size_, smoothing=smoothing)
+            smooth_occupancy_map_2 = sp.maps.smooth_map(
+                occupancy_map_2, bin_size=self.bin_size_, smoothing=smoothing)
+
+            rate_map_1 = smooth_spike_map_1 / smooth_occupancy_map_1
+            rate_map_2 = smooth_spike_map_2 / smooth_occupancy_map_2
+            self._rate_maps_split[action_id][channel_group][unit_name][smoothing] = [rate_map_1, rate_map_2]
+
+        return self._rate_maps_split[action_id][channel_group][unit_name][smoothing]
 
     def rate_map(self, action_id, channel_group, unit_name, smoothing):
         make_rate_map = False

@@ -26,8 +26,8 @@ L 54 139.932
 z
 " style="fill:#ffffff;"/>
    </g>
-   <g clip-path="url(#pb6d6a47ad1)">
-    <image height="6.72" id="image3ecba42d20" transform="scale(1 -1)translate(0 -6.72)" width="335.04" x="54" xlink:href="data:image/png;base64,
+   <g clip-path="url(#p028ce914ca)">
+    <image height="6.72" id="imaged63c39769e" transform="scale(1 -1)translate(0 -6.72)" width="335.04" x="54" xlink:href="data:image/png;base64,
 iVBORw0KGgoAAAANSUhEUgAAAroAAAAOCAYAAADAOb9TAAAABHNCSVQICAgIfAhkiAAAAUtJREFUeJzt1ktuwzAMBUB9nTP0/uds0wuEbyGgiwozyxCPlFy7YB/r690Ko4+q1NaYZW2Ow9zhvP0HPWOuh7OE2mnPlDue1w57th5ydc8Z56Vzfp5X/d5aazvMmj3l6lq89/u0Zy3lVvnF5twOuRlqT8rVpbbfdTCdZcVcXZst5EIt537qWq9rc9Q91zjMre9Qq3uO0HPucJYZaiE3wss0wh9+hheth5d+PGWp9VV/D32H2lP/D+kr1J7wRaTcrnP9WaFnmLfrXJ8h9+zPv6dMmrWLfq21tsLdUi6eJeR2eFlmukPKpbO8jua1FebFs9R3j3cYZ8+sr8P7hefS43M5y9VfHgAA/GMWXQAArmTRBQDgShZdAACuZNEFAOBKFl0AAK5k0QUA4EoWXQAArmTRBQDgShZdAACuZNEFAOBKFl0AAK5k0QUA4Eq/v8Ah227pt5oAAAAASUVORK5CYII=" y="-139.908"/>
    </g>
    <g id="matplotlib.axis_1">
@@ -44,7 +44,7 @@ iVBORw0KGgoAAAANSUhEUgAAAroAAAAOCAYAAADAOb9TAAAABHNCSVQICAgIfAhkiAAAAUtJREFUeJzt
   </g>
  </g>
  <defs>
-  <clipPath id="pb6d6a47ad1">
+  <clipPath id="p028ce914ca">
    <rect height="6.696" width="334.8" x="54" y="139.932"/>
   </clipPath>
  </defs>

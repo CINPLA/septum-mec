@@ -27,7 +27,9 @@ _name = lambda u: u.annotations['name']
 
 
 class Data:
-    def __init__(self, project_path, action_ids, group_ids, position_sampling_rate, position_low_pass_frequency):
+    def __init__(
+        self, project_path, action_ids, group_ids, position_sampling_rate,
+        position_low_pass_frequency, box_size):
         project = expipe.get_project(project_path)
         actions = project.actions
         self._data = {}
@@ -39,9 +41,9 @@ class Data:
             data_path = dp.get_data_path(action)
             epochs = dp.load_epochs(data_path)
             x, y, t, speed = dp.load_tracking(
-                data_path, position_sampling_rate, position_low_pass_frequency)
+                data_path, position_sampling_rate, position_low_pass_frequency, box_size=box_size)
             a, at = dp.load_head_direction(
-                data_path, position_sampling_rate, position_low_pass_frequency)
+                data_path, position_sampling_rate, position_low_pass_frequency, box_size=box_size)
 
             self._data[action_id] = {
                 'x': x,

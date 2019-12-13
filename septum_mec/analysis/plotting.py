@@ -100,6 +100,9 @@ def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test=
     elif test == 'permutation_resampling':
         pvalue, observed_diff, diffs = permutation_resampling(control, stimulated, statistic=np.median)
         print("P-test: diff", observed_diff, 'p value', pvalue)
+    elif test == 'wilcoxon':
+        from scipy.stats import wilcoxon
+        Uvalue, pvalue = wilcoxon(control, stimulated)
     else:
         raise KeyError('Unable to recognize {}'.format(test))
     colors = colors if colors is not None else ['#2166ac', '#b2182b']
@@ -147,6 +150,115 @@ def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test=
     plt.text((x1 + x2) / 2, y + h, significance, ha='center', va='bottom')
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
+
+
+def swarm_violin(x, data, ax=None, clip=None, color='k'):
+    if ax is None:
+        fig, ax = plt.subplots()
+    sns.set_palette(palette=color)
+
+    ticks = list(range(len(x)))
+    data_list = [data[d].values for d in x]
+
+    violins = ax.violinplot(
+        data_list, ticks, showmedians=True, showextrema=False, points=1000, bw_method=.3)
+
+    for category in ['cbars', 'cmins', 'cmaxes', 'cmedians']:
+        if category in violins:
+            violins[category].set_color(['w', 'w'])
+            violins[category].set_linewidth(2.0)
+            violins[category].set_zorder(10000)
+
+    for c, pc in zip(color, violins['bodies']):
+        pc.set_facecolor(c)
+#         pc.set_edgecolor(c)
+        pc.set_alpha(0.4)
+
+    sns.stripplot(data=data_list, size=4, ax=ax)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    y = -np.inf
+    if clip is None:
+        for val in data_list:
+            data_max = max(val)
+            data_min = min(val)
+            y_ = data_max * 1.05 + 0.025 * (data_max - data_min)
+            if y_ > y:
+                y = y_
+    else:
+        y = clip
+        ax.set_ylim(0, clip)
+
+    x = 1
+    for val in data_list[1:]:
+        Uvalue, pvalue = wilcoxon(
+            data_list[0] - val, alternative='less')
+        # significance
+        if pvalue < 0.0001:
+            significance = "****"
+        elif pvalue < 0.001:
+            significance = "***"
+        elif pvalue < 0.01:
+            significance = "**"
+        elif pvalue < 0.05:
+            significance = "*"
+        else:
+            significance = "ns"
+
+        ax.text(x, y, significance, ha='center', va='bottom')
+        x += 1
+
+
+def regplot(x, y, data=None, model=None, ci=95., scatter_color=None, model_color='k', ax=None,
+            scatter_kws={}, regplot_kws={}, cmap=None, cax=None, clabel=None,
+            xlabel=False, ylabel=False, colorbar=False, **kwargs):
+    if model is None:
+        import statsmodels.api as sm
+        model = sm.OLS
+    from seaborn import utils
+    from seaborn import algorithms as algo
+    if ax is None:
+        fig, ax = plt.subplots()
+    if data is None:
+        _x = x
+        _y = y
+    else:
+        _x = data[x]
+        _y = data[y]
+    grid = np.linspace(_x.min(), _x.max(), 100)
+
+    X = np.c_[np.ones(len(_x)), _x]
+    G = np.c_[np.ones(len(grid)), grid]
+
+    results = model(_y, X, **kwargs).fit()
+
+    def reg_func(xx, yy):
+        yhat = model(yy, xx, **kwargs).fit().predict(G)
+        return yhat
+    yhat = results.predict(G)
+    yhat_boots = algo.bootstrap(
+        X, _y, func=reg_func, n_boot=1000, units=None)
+    err_bands = utils.ci(yhat_boots, ci, axis=0)
+    ax.plot(grid, yhat, color=model_color, **regplot_kws)
+    sc = ax.scatter(_x, _y, c=scatter_color, **scatter_kws)
+    ax.fill_between(grid, *err_bands, facecolor=model_color, alpha=.15)
+    if colorbar:
+        cb = plt.colorbar(mappable=sc, cax=cax, ax=ax)
+        cb.ax.yaxis.set_ticks_position('right')
+        if clabel: cb.set_label(clabel)
+
+    if xlabel:
+        if isinstance(xlabel, str):
+            ax.set_xlabel(xlabel)
+        else:
+            ax.set_xlabel(x)
+    if ylabel:
+        if isinstance(ylabel, str):
+            ax.set_ylabel(ylabel)
+        else:
+            ax.set_ylabel(y)
+    return results
 
 
 def despine(ax=None, left=False, right=True, top=True, bottom=False,
