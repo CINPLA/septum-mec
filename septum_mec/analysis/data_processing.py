@@ -604,7 +604,6 @@ class Data:
         if smoothing not in self._rate_maps[action_id][channel_group][unit_name]:
             make_rate_map = True
 
-
         if make_rate_map:
             xbins, ybins = self.spatial_bins
 

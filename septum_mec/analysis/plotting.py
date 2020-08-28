@@ -66,7 +66,7 @@ def plot_waveforms(sptr, fig=None, gs=None, f=None, n=None, **kwargs):
     return fig
 
 
-def plot_bootstrap_timeseries(times, signals, num_samples=1000, statistic=None, alpha=0.05, ax=None, **kwargs):
+def plot_bootstrap_timeseries(times, signals, num_samples=1000, statistic=None, alpha=0.05, ax=None, normalize_values=False, **kwargs):
     '''
     times : array
         time for signal
@@ -83,11 +83,46 @@ def plot_bootstrap_timeseries(times, signals, num_samples=1000, statistic=None, 
     if ax is None:
         fig, ax = plt.subplots(1, 1)
     cis = []
-    values = []
+    values = np.array([statistic(signal) for signal in signals])
+    if normalize_values:
+        signals = signals - values.min()
+        values = values - values.min()
+        signals = signals / values.max()
+        values = values / values.max()
     for signal in signals:
         ci = bootstrap(signal, num_samples=num_samples, statistic=statistic)
         cis.append(ci)
-        values.append(statistic(signal))
+    cis = np.array(cis)
+    ax.plot(times, values, **kwargs)
+    ax.fill_between(times, cis[:,0], cis[:,1], alpha=.5, color=kwargs.get('color'))
+
+
+def plot_uncertainty(times, signals, ax=None, normalize_values=False, **kwargs):
+    '''
+    times : array
+        time for signal
+    signals : array or list of signals
+        each row is a signal, each column is a timepoint
+    num_samples : int
+        The number of repetitions of random samples of your data.
+    statistic : function(2darray, axis)
+        The statistic you want to build the ci. Default is mean
+    alpha : float
+        confidence, 0.05 gives 95 %
+    '''
+    statistic = np.mean
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    cis = []
+    values = np.array([statistic(signal) for signal in signals])
+    if normalize_values:
+        signals = signals - values.min()
+        values = values - values.min()
+        signals = signals / values.max()
+        values = values / values.max()
+    for signal in signals:
+        sem = np.std(signal) / len(signal)
+        cis.append([statistic(signal) - sem, statistic(signal) + sem])
     cis = np.array(cis)
     ax.plot(times, values, **kwargs)
     ax.fill_between(times, cis[:,0], cis[:,1], alpha=.5, color=kwargs.get('color'))
