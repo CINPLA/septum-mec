@@ -342,3 +342,105 @@ def lighten_color(color, amount=0.7):
         c = color
     c = colorsys.rgb_to_hls(*mc.to_rgb(c))
     return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
+
+
+from seaborn.categorical import _ViolinPlotter
+from seaborn.utils import remove_na
+
+
+class MyVPlot(_ViolinPlotter):
+
+    def draw_to_density(self, ax, center, val, support, density, split, **kws):
+        """Draw a line orthogonal to the value axis at width of density."""
+        idx = np.argmin(np.abs(support - val))
+        width = self.dwidth * density[idx] * .99
+
+        kws["color"] = self.gray
+
+        offset = width * 0.1 # draw within edges
+
+        if self.orient == "v":
+            if split == "left":
+                ax.plot([center - width + offset, center - offset], [val, val], **kws)
+            elif split == "right":
+                ax.plot([center + offset, center + width - offset], [val, val], **kws)
+            else:
+                ax.plot([center - width, center + width], [val, val], **kws)
+        else:
+            if split == "left":
+                ax.plot([val, val], [center - width + offset, center - offset], **kws)
+            elif split == "right":
+                ax.plot([val, val], [center + offset, center + width - offset], **kws)
+            else:
+                ax.plot([val, val], [center - width, center + width], **kws)
+
+    def draw_quartiles(self, ax, data, support, density, center, split=False):
+        """Draw the quartiles as lines at width of density."""
+        q25, q50, q75 = np.percentile(data, [25, 50, 75])
+        self.draw_to_density(ax, center, q50, support, density, split,
+                             linewidth=2, )
+
+    def draw_significance(self, ax, test='mann_whitney'):
+        significance = {'top': -np.inf, 'val': {}}
+        for i, group_data in enumerate(self.plot_data):
+            tmp_data = []
+            for j, hue_level in enumerate(self.hue_names):
+                hue_mask = self.plot_hues[i] == hue_level
+                violin_data = remove_na(group_data[hue_mask])
+                tmp_data.append(violin_data)
+
+            if test == 'mann_whitney':
+                Uvalue, pvalue = scipy.stats.mannwhitneyu(*tmp_data, alternative='two-sided')
+            elif test == 'permutation_resampling':
+                pvalue, observed_diff, diffs = permutation_resampling(*tmp_data, statistic=np.median)
+            else:
+                raise KeyError('Unable to recognize {}'.format(test))
+
+            # significance
+            if pvalue < 0.0001:
+                symbol = "****"
+            elif pvalue < 0.001:
+                symbol = "***"
+            elif pvalue < 0.01:
+                symbol = "**"
+            elif pvalue < 0.05:
+                symbol = "*"
+            else:
+                symbol = "ns"
+
+            significance['val'][i] = symbol
+
+            data_max = np.max([max(tmp_data[0]), max(tmp_data[1])]) * 1.05
+#             data_min = np.min([min(tmp_data[0]), min(tmp_data[1])])
+#             y = data_max * 1.05
+#             h = 0.025 * (data_max - data_min)
+
+            if data_max > significance['top']:
+                significance['top'] = data_max
+
+        for i, s in significance['val'].items():
+            plt.text(i, significance['top'], s, ha='center', va='bottom')
+
+
+def split_violinplot(x=None, y=None, hue=None, data=None, order=None, hue_order=None,
+                  bw="scott", cut=0, scale="area", scale_hue=True, gridsize=100,
+                  width=.8, inner="box", split=False, dodge=True, orient=None,
+                  linewidth=None, color=None, palette=None, saturation=.75,
+                  ax=None, draw_significance=True, **kwargs):
+    plotter = MyVPlot(x, y, hue, data, order, hue_order,
+                      bw, cut, scale, scale_hue, gridsize,
+                      width, inner, split, dodge, orient, linewidth,
+                      color, palette, saturation)
+    if ax is None:
+        ax = plt.gca()
+
+    plotter.plot(ax)
+    if draw_significance:
+        plotter.draw_significance(ax)
+
+    for i, c in enumerate(ax.collections):
+        fc = c.get_facecolor()
+        c.set_edgecolor(fc)
+        c.set_alpha(0.8)
+
+    return ax
