@@ -269,7 +269,7 @@ def load_tracking(data_path, sampling_rate, low_pass_frequency, box_size, veloci
 
     vel = np.gradient([x, y], axis=1) / np.gradient(t)
     speed = np.linalg.norm(vel, axis=0)
-
+    x, y, t, speed = np.array(x), np.array(y), np.array(t), np.array(speed)
     return x, y, t, speed
 
 
@@ -483,9 +483,9 @@ class Data:
         stim_times = self.stim_times(action_id)
         if stim_times is None:
             if self.baseline_duration is None:
-                return [0, get_duration(self.data_path(action_id))]
+                return [0, float(get_duration(self.data_path(action_id)).magnitude)]
             else:
-                return [0, self.baseline_duration]
+                return [0, float(self.baseline_duration)]
         stim_times = np.array(stim_times)
         return [stim_times.min(), stim_times.max()]
 

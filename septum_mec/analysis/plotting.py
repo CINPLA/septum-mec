@@ -1,7 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from spike_statistics.core import bootstrap, permutation_resampling
+from spike_statistics.core import bootstrap_ci, permutation_resampling_test
 import scipy
+
+    
+def savefig(*args, **kwargs):
+    plt.savefig(args[0].with_suffix('.png'), *args[1:], **kwargs, bbox_inches="tight", transparent=True, dpi=300)
+    plt.savefig(args[0].with_suffix('.svg'), *args[1:], **kwargs, bbox_inches="tight", transparent=True)
 
 def plot_psth(spike_times, stim_times, start_time, stop_time, binsize):
     fig, axs = plt.subplots(2, 1, sharex=True)
@@ -90,7 +95,7 @@ def plot_bootstrap_timeseries(times, signals, num_samples=1000, statistic=None, 
         signals = signals / values.max()
         values = values / values.max()
     for signal in signals:
-        ci = bootstrap(signal, num_samples=num_samples, statistic=statistic)
+        ci = bootstrap_ci(signal, num_samples=num_samples, statistic=statistic)
         cis.append(ci)
     cis = np.array(cis)
     ax.plot(times, values, **kwargs)
@@ -128,18 +133,19 @@ def plot_uncertainty(times, signals, ax=None, normalize_values=False, **kwargs):
     ax.fill_between(times, cis[:,0], cis[:,1], alpha=.5, color=kwargs.get('color'))
 
 
-def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test='mann_whitney', colors=None):
-    if test == 'mann_whitney':
-        Uvalue, pvalue = scipy.stats.mannwhitneyu(control, stimulated, alternative='two-sided')
-        print("U-test: U value", Uvalue, 'p value', pvalue)
-    elif test == 'permutation_resampling':
-        pvalue, observed_diff, diffs = permutation_resampling(control, stimulated, statistic=np.median)
-        print("P-test: diff", observed_diff, 'p value', pvalue)
-    elif test == 'wilcoxon':
-        from scipy.stats import wilcoxon
-        Uvalue, pvalue = wilcoxon(control, stimulated)
-    else:
-        raise KeyError('Unable to recognize {}'.format(test))
+def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test='mann_whitney', colors=None, draw_significance=True):
+    if draw_significance:
+        if test == 'mann_whitney':
+            Uvalue, pvalue = scipy.stats.mannwhitneyu(control, stimulated, alternative='two-sided')
+            print("U-test: U value", Uvalue, 'p value', pvalue)
+        elif test == 'permutation_resampling':
+            pvalue, observed_diff, diffs = permutation_resampling_test(control, stimulated, statistic=np.median)
+            print("P-test: diff", observed_diff, 'p value', pvalue)
+        elif test == 'wilcoxon':
+            from scipy.stats import wilcoxon
+            Uvalue, pvalue = wilcoxon(control, stimulated)
+        else:
+            raise KeyError('Unable to recognize {}'.format(test))
     colors = colors if colors is not None else ['#2166ac', '#b2182b']
     pos = [0.0, 0.6]
 
@@ -156,33 +162,35 @@ def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test=
 
     # for i, body in enumerate(violins['cbars']):
     #     body.set_color('C{}'.format(i))
+    
+    plt.xticks(pos, xticks)
 
     for category in ['cbars', 'cmins', 'cmaxes', 'cmedians']:
         if category in violins:
             violins[category].set_color(['k', 'k'])
             violins[category].set_linewidth(2.0)
+            
+    if draw_significance:
+        # significance
+        if pvalue < 0.0001:
+            significance = "****"
+        elif pvalue < 0.001:
+            significance = "***"
+        elif pvalue < 0.01:
+            significance = "**"
+        elif pvalue < 0.05:
+            significance = "*"
+        else:
+            significance = "ns"
 
-    # significance
-    if pvalue < 0.0001:
-        significance = "****"
-    elif pvalue < 0.001:
-        significance = "***"
-    elif pvalue < 0.01:
-        significance = "**"
-    elif pvalue < 0.05:
-        significance = "*"
-    else:
-        significance = "ns"
-
-    plt.xticks(pos, xticks)
-
-    x1, x2 = pos
-    data_max = np.max([max(control), max(stimulated)])
-    data_min = np.min([min(control), min(stimulated)])
-    y = data_max * 1.05
-    h = 0.025 * (data_max - data_min)
-    plt.plot([x1, x1, x2, x2], [y - h, y, y, y - h], c='k')
-    plt.text((x1 + x2) / 2, y + h, significance, ha='center', va='bottom')
+        x1, x2 = pos
+        data_max = np.max([max(control), max(stimulated)])
+        data_min = np.min([min(control), min(stimulated)])
+        y = data_max * 1.05
+        h = 0.025 * (data_max - data_min)
+        plt.plot([x1, x1, x2, x2], [y - h, y, y, y - h], c='k')
+        plt.text((x1 + x2) / 2, y + h, significance, ha='center', va='bottom')
+        
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
 
@@ -392,7 +400,7 @@ class MyVPlot(_ViolinPlotter):
             if test == 'mann_whitney':
                 Uvalue, pvalue = scipy.stats.mannwhitneyu(*tmp_data, alternative='two-sided')
             elif test == 'permutation_resampling':
-                pvalue, observed_diff, diffs = permutation_resampling(*tmp_data, statistic=np.median)
+                pvalue, observed_diff, diffs = permutation_resampling_test(*tmp_data, statistic=np.median)
             else:
                 raise KeyError('Unable to recognize {}'.format(test))
 
