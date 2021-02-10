@@ -470,6 +470,7 @@ class Data:
         self._lfp = {}
         self._occupancy = {}
         self._rate_maps = {}
+        self._tracking_split = {}
         self._rate_maps_split = {}
         self._prob_dist = {}
         self._spatial_bins = None
@@ -544,6 +545,30 @@ class Data:
                 self.tracking(action_id)['y'], bins=(xbins, ybins))
             self._prob_dist[action_id] = prob_dist
         return self._prob_dist[action_id]
+    
+    def tracking_split(self, action_id):
+        if action_id not in self._tracking_split:
+            x, y, t, v = map(self.tracking(action_id).get, ['x', 'y', 't', 'v'])
+
+            t_split = t[-1] / 2
+            mask_1 = t < t_split
+            mask_2 = t >= t_split
+            x1, y1, t1, v1 = x[mask_1], y[mask_1], t[mask_1], v[mask_1]
+            x2, y2, t2, v2 = x[mask_2], y[mask_2], t[mask_2], v[mask_2]
+
+        
+            self._tracking_split[action_id] = {
+                'x1': x1, 'y1': y1, 't1': t1, 'v1': v1,
+                'x2': x2, 'y2': y2, 't2': t2, 'v2': v2
+            }
+        return self._tracking_split[action_id]
+        
+    def spike_train_split(self, action_id, channel_group, unit_name):
+        spikes = self.spike_train(action_id, channel_group, unit_name)
+        t_split = self.duration(action_id) / 2
+        spikes_1 = spikes[spikes < t_split]
+        spikes_2 = spikes[spikes >= t_split]
+        return spikes_1, spikes_2, t_split
 
     def rate_map_split(self, action_id, channel_group, unit_name, smoothing):
         make_rate_map = False
