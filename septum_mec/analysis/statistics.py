@@ -100,8 +100,8 @@ class VonMisesKDE():
         return self.fn(input_x)
     
     
-def compute_weighted_mean_sem(data, label):
-    group = data.groupby('entity')
+def compute_weighted_mean_sem(data, label, groupby='entity'):
+    group = data.groupby(groupby)
     tmp = [d.loc[:, label].dropna().values for _, d in group]
     values = np.concatenate(tmp)
     if len(values) == 0:
