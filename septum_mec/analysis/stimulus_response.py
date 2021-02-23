@@ -40,12 +40,12 @@ def compute_response(spike_times, stim_times, times, kernel, e_percentile, i_per
     return te_peak, pe_peak, ti_peak, pi_peak
 
 
-def stimulus_response_latency(spike_times, stim_times, window, std, percentile=99, plot=False):
+def stimulus_response_latency(spike_times, stim_times, window, std, t_start=0, percentile=99, plot=False):
     from scipy.stats import gaussian_kde
     spike_times = np.array(spike_times)
     stim_times = np.array(stim_times)
     n_spikes, n_stim = len(spike_times), len(stim_times)
-    times = np.arange(0, window, 1e-4)
+    times = np.arange(t_start, t_start + window, 1e-4)
     trials = [spike_times[(spike_times >= t - window) & (spike_times <= t + window)] - t
               for t in stim_times]
     spikes = [s for t in trials for s in t]
