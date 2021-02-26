@@ -274,10 +274,12 @@ def make_paired_tables(data, keys, drop_duplicates=True, queries=None, labels=No
     return results, labels
 
 
-def LMM(df, case, control, key, use_unit_id=True):
+def LMM(df, case, control, key='val', use_unit_id=True, method=['powell', "lbfgs", 'bfgs', 'cg', 'basinhopping']):
+    import statsmodels.api as sm
+    import statsmodels.formula.api as smf
     dd = pd.DataFrame()
     dd[key] = df[case]
-    dd['label'] = case
+    dd['label'] = 0
     dd['entity'] = df['entity']
 
     ddd = pd.DataFrame()
@@ -286,25 +288,34 @@ def LMM(df, case, control, key, use_unit_id=True):
     if use_unit_id:
         dd['unit_idnum'] = df['unit_idnum']
         ddd['unit_idnum'] = df['unit_idnum']
-    ddd['label'] = control
+    ddd['label'] = 1
     dff = pd.concat([dd, ddd]).replace([np.inf, -np.inf], np.nan).dropna().reset_index()
 
     if dff.empty:
-        return [np.nan] * 4
+        return [np.nan] * 4 + ['empty']
     
     if use_unit_id:
         vc = {'unit_idnum': '0 + C(unit_idnum)'}
     else:
         vc = None
         
-    md = smf.mixedlm(f"{key} ~ label", dff, groups="entity", missing='drop', vc_formula=vc, re_formula='label')
-
-    mdf = md.fit()
-    
+    mdf = smf.mixedlm(f"{key} ~ label", dff, groups="entity", missing='drop', vc_formula=vc, re_formula='label').fit(method=method)    
     low, high = mdf.conf_int(alpha=0.05).iloc[1,:].values
     pval = mdf.pvalues[1]
+    marker = ''
+    if np.isnan(pval):
+        marker = '*'
+        mdf = smf.mixedlm(f"{key} ~ label", dff, groups="entity", missing='drop', re_formula='label').fit(method=method)
+        low, high = mdf.conf_int(alpha=0.05).iloc[1,:].values
+        pval = mdf.pvalues[1]
+        
+    if np.isnan(pval):
+        marker = '**'
+        mdf = smf.mixedlm(f"{key} ~ label", dff, groups="entity", missing='drop').fit(method=method)
+        low, high = mdf.conf_int(alpha=0.05).iloc[1,:].values
+        pval = mdf.pvalues[1]
     
-    return pval, low, high, mdf
+    return pval, low, high, mdf, marker
 
 
 def rename(name):
@@ -381,54 +392,72 @@ def compute_weighted_mean_sem(data, label, groupby='entity'):
     return average, sem, len(values)
 
 
-def make_statistics_table(results, labels, lmm_test=True, wilcoxon_test=False, ttest_ind_test=False, ttest_rel_test=False, mannwhitney_test=False, show_cohen_d=False):
+def make_statistics_table(
+    results, labels, lmm_test=True, wilcoxon_test=False, ttest_ind_test=False, ttest_rel_test=False, 
+    mannwhitney_test=False, show_cohen_d=False, use_weighted_stats=True, normality_test=False, block_permutation_test=False):
     stat_formatted = pd.DataFrame()
     stat_values = pd.DataFrame()
     for key, df in results.items():
         Key = rename(key)
         for label in labels:
-#             average, sem, n = df[label].mean(), df[label].sem(), df[label].count()
-            average, sem, n = compute_weighted_mean_sem(df, label)
-            stat_formatted.loc[label, Key] = np.nan if np.isnan(average) else "{:.1e} ± {:.1e} ({})".format(average, sem, n)
-            stat_values.loc[label, key] = average
-
-            if df[label].count() < 8:
-                stat_formatted.loc[f'Normality {label}', Key] = np.nan
+            if use_weighted_stats:
+                average, sem, n = compute_weighted_mean_sem(df, label)
             else:
-                statistic, pval = normality(df, label)
-                if np.isnan(statistic):
+                average, sem, n = df[label].mean(), df[label].sem(), df[label].count()
+            stat_formatted.loc[label, Key] = np.nan if np.isnan(average) else "{:.3g} ± {:.3g} ({})".format(average, sem, n)
+            stat_values.loc[label, key] = average
+            
+            if normality_test:
+                if df[label].count() < 8:
                     stat_formatted.loc[f'Normality {label}', Key] = np.nan
                 else:
-                    stat_formatted.loc[f'Normality {label}', Key] = "{:.1e}, {:.1e}".format(statistic, pval)
+                    statistic, pval = normality(df, label)
+                    if np.isnan(statistic):
+                        stat_formatted.loc[f'Normality {label}', Key] = np.nan
+                    else:
+                        stat_formatted.loc[f'Normality {label}', Key] = "{:.3g}, {:.3g}".format(statistic, pval)
 
         for i, c1 in enumerate(labels):
             for c2 in labels[i+1:]:
                 if wilcoxon_test:
                     statistic, pval, n = wilcoxon(df, [c1, c2])
-                    stat_formatted.loc[f'Wilcoxon {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.1e}, {:.1e}, ({})".format(statistic, pval, n)
+                    stat_formatted.loc[f'Wilcoxon {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.3g}, {:.3g}, ({})".format(statistic, pval, n)
                     stat_values.loc[f'Wilcoxon {c1} - {c2}', key] = pval
+                    dff = df.loc[:,[c1, c2]].dropna()
+                    m1, s1, m2, s2 = dff[c1].mean(), dff[c1].sem(), dff[c2].mean(), dff[c2].sem()
+                    stat_formatted.loc[f'Paired summary {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.3g} ± {:.3g}, {:.3g} ± {:.3g}".format(m1, s1, m2, s2)
                 
                 if ttest_ind_test:
                     statistic, pval = ttest_ind(df, [c1, c2])
-                    stat_formatted.loc[f'T test ind {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.1e}, {:.1e}".format(statistic, pval)
+                    stat_formatted.loc[f'T test ind {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.3g}, {:.3g}".format(statistic, pval)
                     stat_values.loc[f'T test ind {c1} - {c2}', key] = pval
                     
                 if ttest_rel_test:
                     statistic, pval = ttest_rel(df, [c1, c2])
-                    stat_formatted.loc[f'T test pair {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.1e}, {:.1e}".format(statistic, pval)
+                    stat_formatted.loc[f'T test pair {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.3g}, {:.3g}".format(statistic, pval)
                     stat_values.loc[f'T test pair {c1} - {c2}', key] = pval
                     
                 if mannwhitney_test:
                     statistic, pval = MWU(df, [c1, c2])
-                    stat_formatted.loc[f'MWU {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.1e}, {:.1e}".format(statistic, pval)
+                    stat_formatted.loc[f'MWU {c1} - {c2}', Key] = np.nan if np.isnan(statistic) else "{:.3g}, {:.3g}".format(statistic, pval)
                     stat_values.loc[f'MWU {c1} - {c2}', key] = pval
                     
                 if lmm_test:
                     try:
-                        pval, low, high, _ = LMM(df, c1, c2, key)
+                        pval, low, high, mdf, marker = LMM(df, c1, c2)
                     except np.linalg.LinAlgError:
                         pval = np.nan
-                    stat_formatted.loc[f'LMM {c1} - {c2}', Key] = np.nan if np.isnan(pval) else "{:.1e} [{:.1e}, {:.1e}]".format(pval, low, high)
+                    try:
+                        coef = mdf.fe_params[1]
+                    except:
+                        coef = np.nan
+                    if marker=='empty':
+                        lmm_res = marker
+                    elif np.isnan(pval):
+                        lmm_res = np.nan
+                    else: 
+                        lmm_res = r"\beta={:.3g}, p={:.3g}{}".format(coef, pval, marker)
+                    stat_formatted.loc[f'LMM {c1} - {c2}', Key] = lmm_res
                     stat_values.loc[f'{c1} - {c2}', key] = pval
                     
                 if show_cohen_d: # wrong for imbalanced data

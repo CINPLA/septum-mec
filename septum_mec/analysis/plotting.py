@@ -133,7 +133,7 @@ def plot_uncertainty(times, signals, ax=None, normalize_values=False, **kwargs):
     ax.fill_between(times, cis[:,0], cis[:,1], alpha=.5, color=kwargs.get('color'))
 
 
-def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test='mann_whitney', colors=None, draw_significance=True):
+def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test='wilcoxon', colors=None, draw_significance=True):
     if draw_significance:
         if test == 'mann_whitney':
             Uvalue, pvalue = scipy.stats.mannwhitneyu(control, stimulated, alternative='two-sided')
@@ -146,29 +146,21 @@ def violinplot(control, stimulated, xticks=["Baseline  ", "  Stimulated"], test=
             Uvalue, pvalue = wilcoxon(control, stimulated)
         else:
             raise KeyError('Unable to recognize {}'.format(test))
+            
     colors = colors if colors is not None else ['#2166ac', '#b2182b']
     pos = [0.0, 0.6]
 
     violins = plt.violinplot([control, stimulated], pos, showmedians=True, showextrema=False)
-
-#     for i, body in enumerate(violins['bodies']):
-#         body.set_color('C{}'.format(i))
-#         body.set_linewidth(2)#         body.set_linewidth(2)
-    violins['bodies'][0].set_color(colors[0])
-    violins['bodies'][1].set_color(colors[1])
-
-    violins['bodies'][0].set_alpha (0.8)
-    violins['bodies'][1].set_alpha (0.8)
-
-    # for i, body in enumerate(violins['cbars']):
-    #     body.set_color('C{}'.format(i))
     
-    plt.xticks(pos, xticks)
+    for i, b in enumerate(violins['bodies']):
+        b.set_color(colors[i])
+        b.set_alpha (0.8)
 
     for category in ['cbars', 'cmins', 'cmaxes', 'cmedians']:
         if category in violins:
             violins[category].set_color(['k', 'k'])
             violins[category].set_linewidth(2.0)
+    plt.xticks(pos, xticks, rotation=45)
             
     if draw_significance:
         # significance
