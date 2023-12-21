@@ -1,0 +1,4 @@
+git+https://github.com/CINPLA/phase-precession.git@master#egg=phase_precession
+git+https://github.com/CINPLA/spike-statistics.git@dev#egg=spike_statistics
+scikit-image
+pycwt

@@ -20,3 +20,5 @@ cp -r /projects/ec109/conda-envs/ipykernels/septum-mec ~/.local/share/jupyter/ke
 ```
 
 You might have to restart to see the septum-mec kernel in jupyter notebook
+
+septum-mec/notebooks/exploratory/time-frequency.ipynb
