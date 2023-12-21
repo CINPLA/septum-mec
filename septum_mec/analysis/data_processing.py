@@ -3,7 +3,7 @@ import neo
 import numpy as np
 import exdir
 import exdir.plugins.quantities
-import exdir.plugins.git_lfs
+#import exdir.plugins.git_lfs
 import pathlib
 import os
 import quantities as pq
@@ -14,7 +14,7 @@ import warnings
 
 
 def project_path():
-    path = os.environ.get("SEPTUM_MEC_DATA")
+    path = "/projects/ec109/Mikkel/septum-mec/"#os.environ.get("SEPTUM_MEC_DATA")
     if path is None:
         raise Exception("Need to set `SEPTUM_MEC_DATA` as environment variable first.")
     else:
@@ -170,7 +170,7 @@ def unit_path(channel_id, unit_id):
 def load_leds(data_path):
     root_group = exdir.File(
         data_path, "r",
-        plugins=[exdir.plugins.quantities, exdir.plugins.git_lfs])
+        plugins=[exdir.plugins.quantities])#, exdir.plugins.git_lfs])
 
     # tracking data
     position_group = root_group['processing']['tracking']['camera_0']['Position']
@@ -727,7 +727,7 @@ class Data:
                 self._stim_times[action_id] = None
             elif len(epochs) == 1:
                 stim_times = epochs[0]
-                stim_times = np.sort(np.abs(stim_times))
+                stim_times = np.sort(np.abs(np.array(stim_times)))
                 # there are some 0 times and inf times, remove those
                 stim_times = stim_times[stim_times <= get_duration(self.data_path(action_id))]
                 # stim_times = stim_times[stim_times >= 1e-20]
